@@ -149,10 +149,81 @@ function readArtifactText(id: string) {
   return artifact?.body ?? "";
 }
 
-function createTaskSpec(runId: string, taskSpecBody: string) {
+function readTargetRepoSnapshot() {
+  if (!fs.existsSync(targetRepoDir)) {
+    return "目标仓库不存在。";
+  }
+
+  const files: Array<{ path: string; content?: string }> = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if ([".git", "node_modules", "dist", "coverage", "test-results"].includes(entry.name)) {
+        continue;
+      }
+
+      const absolutePath = path.join(dir, entry.name);
+      const relativePath = path.relative(targetRepoDir, absolutePath);
+
+      if (entry.isDirectory()) {
+        walk(absolutePath);
+        continue;
+      }
+
+      if (!entry.isFile()) {
+        continue;
+      }
+
+      if (files.length >= 40) {
+        return;
+      }
+
+      const text = fs.readFileSync(absolutePath, "utf8");
+      files.push({ path: relativePath, content: text.slice(0, 6000) });
+    }
+  };
+
+  walk(targetRepoDir);
+  return JSON.stringify(files, null, 2);
+}
+
+function runTargetVerification() {
+  const commands = [
+    ["npm", ["test"]],
+    ["npm", ["run", "build"]],
+  ] as const;
+
+  return commands.map(([command, args]) => {
+    const result = spawnSync(command, args, {
+      cwd: targetRepoDir,
+      encoding: "utf8",
+      timeout: 60_000,
+    });
+
+    return {
+      command: [command, ...args].join(" "),
+      status: result.status,
+      signal: result.signal,
+      stdout: result.stdout?.slice(0, 4000) ?? "",
+      stderr: result.stderr?.slice(0, 4000) ?? "",
+      error: result.error?.message,
+    };
+  });
+}
+
+function createTaskSpec(
+  runId: string,
+  taskSpecBody: string,
+  options: {
+    id?: string;
+    messageId?: string;
+    goal: string;
+    doNotImplementSmallCalcYet: boolean;
+    acceptanceCriteria: string[];
+  },
+) {
   return {
-    id: "task-smallcalc-mvp-001",
-    messageId: "MSG-001",
+    id: options.id ?? "task-smallcalc-mvp-001",
+    messageId: options.messageId ?? "MSG-001",
     from: "小五",
     to: "CC",
     type: "TaskSpec",
@@ -172,15 +243,11 @@ function createTaskSpec(runId: string, taskSpecBody: string) {
     },
     payload: {
       product: "SmallCalc",
-      goal: "小五基于真实 PRD 生成 TaskSpec，并通过 Codex App Server 调用器启动和管理 CC。",
+      goal: options.goal,
       taskSpecBody,
-      acceptanceCriteria: [
-        "CC 必须通过 Codex App Server thread/turn 接收任务",
-        "CC 必须写回 ImplementationReport",
-        "UI 必须显示 Codex App Server 结构化事件",
-      ],
+      acceptanceCriteria: options.acceptanceCriteria,
       constraints: {
-        doNotImplementSmallCalcYet: true,
+        doNotImplementSmallCalcYet: options.doNotImplementSmallCalcYet,
         writeReportToXiaowuInbox: true,
       },
     },
@@ -193,21 +260,23 @@ function buildCcPrompt(taskPath: string, reportPath: string, runId: string) {
 请严格读取 TaskSpec，并按 TaskSpec 执行。当前阶段如果 TaskSpec 明确要求不要实现 SmallCalc，就不得实现；如果 TaskSpec 要求实现，则按目标仓库完成实现。
 
 1. 读取 TaskSpec 文件：${taskPath}
-2. 输出几条简短进度日志，说明你读到了任务、确认目标仓库、准备写报告。
+2. 在目标仓库中按 TaskSpec 执行；如果 TaskSpec 要求实现 SmallCalc，就真实创建或修改代码、运行可用的验证命令。
 3. 创建 ImplementationReport JSON 文件：${reportPath}
 
 ImplementationReport JSON 必须包含：
 {
-  "id": "report-smallcalc-mvp-001",
-  "messageId": "MSG-002",
+  "id": "<report file basename without .json>",
+  "messageId": "<new message id>",
   "from": "CC",
   "to": "小五",
   "type": "ImplementationReport",
   "runId": "${runId}",
   "status": "submitted",
   "payload": {
-    "summary": "CC 已通过 Codex App Server 收到并读取 TaskSpec，并已按 TaskSpec 提交本轮执行报告。",
-    "didImplementSmallCalc": false,
+    "summary": "<本轮真实完成情况>",
+    "didImplementSmallCalc": <true 或 false>,
+    "changedFiles": ["<真实修改或创建的文件>"],
+    "verification": ["<真实运行过的命令和结果>"],
     "next": "等待小五验收。"
   }
 }
@@ -407,7 +476,15 @@ function agentBusPlugin() {
             summary: "小五通过真实 LLM 将 PRD 转成 TaskSpec。",
             body: taskSpecBody,
           });
-          const task = createTaskSpec(runId, taskSpecBody);
+          const task = createTaskSpec(runId, taskSpecBody, {
+            goal: "小五基于真实 PRD 生成 TaskSpec，并通过 Codex App Server 调用器启动和管理 CC。本轮只验证通信链路，不实现 SmallCalc。",
+            doNotImplementSmallCalcYet: true,
+            acceptanceCriteria: [
+              "CC 必须通过 Codex App Server thread/turn 接收任务",
+              "CC 必须写回 ImplementationReport",
+              "UI 必须显示 Codex App Server 结构化事件",
+            ],
+          });
           const taskPath = path.join(ccInboxDir, `${task.id}.json`);
           const reportPath = path.join(xiaowuInboxDir, "report-smallcalc-mvp-001.json");
 
@@ -454,12 +531,118 @@ function agentBusPlugin() {
           return;
         }
 
-        sendJson(res, { error: "Not found" }, 404);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "Unknown API error";
-          sendJson(res, { error: message }, 500);
+        if (req.method === "POST" && req.url === "/api/xiaowu/fix-task") {
+          await readBody(req);
+          ensureTargetRepo();
+
+          const prdBody = readArtifactText("prd-smallcalc-v1");
+          const taskSpecBody = readArtifactText("taskspec-smallcalc-v1");
+          const reviewBody = readArtifactText("review-smallcalc-v1");
+          const firstReport = readJsonFile<{ payload?: unknown } | null>(
+            path.join(xiaowuInboxDir, "report-smallcalc-mvp-001.json"),
+            null,
+          );
+
+          if (!prdBody || !taskSpecBody || !reviewBody || !firstReport) {
+            sendJson(
+              res,
+              { error: "PRD, TaskSpec, first ImplementationReport and ReviewResult are required before FixTask." },
+              409,
+            );
+            return;
+          }
+
+          const runId = `run-${Date.now()}`;
+          const runDir = path.join(runsDir, runId);
+          const fixTaskBody = await llmProvider.complete([
+            {
+              role: "system",
+              content:
+                "你是小五 PM Agent。请基于 PRD、上一轮 TaskSpec、CC 报告和小五验收结果，生成给 Coding Agent 的真实整改任务。输出中文 Markdown，不要编造执行结果。",
+            },
+            {
+              role: "user",
+              content: `请生成 SmallCalc 真实实现整改任务。要求 CC 这次必须在目标仓库实现 SmallCalc MVP、运行验证命令、写回 ImplementationReport。不得使用 mock，不得只补报告。\n\nPRD:\n${prdBody}\n\n上一轮 TaskSpec:\n${taskSpecBody}\n\nCC 上一轮 ImplementationReport:\n${JSON.stringify(firstReport, null, 2)}\n\n小五验收结果:\n${reviewBody}`,
+            },
+          ]);
+
+          writeArtifact("fixtask-smallcalc-v1", {
+            stepId: 6,
+            actor: "小五",
+            to: "CC",
+            type: "FixTask",
+            title: "SmallCalc 实现整改任务 v1",
+            status: "created",
+            summary: "小五通过真实 LLM 将不通过验收转成 CC 整改任务。",
+            body: fixTaskBody,
+          });
+
+          const task = createTaskSpec(runId, fixTaskBody, {
+            id: "task-smallcalc-implementation-001",
+            messageId: "MSG-003",
+            goal: "小五第一次验收不通过后，要求 CC 真实实现 SmallCalc MVP，并提交可验收的 ImplementationReport。",
+            doNotImplementSmallCalcYet: false,
+            acceptanceCriteria: [
+              "CC 必须在目标仓库真实实现 SmallCalc MVP",
+              "CC 必须运行可用的验证命令，并在报告中写明命令和结果",
+              "CC 必须写回 ImplementationReport，且 didImplementSmallCalc 必须反映真实实现结果",
+              "不得用 mock、占位文件或只补报告冒充实现",
+            ],
+          });
+          const taskPath = path.join(ccInboxDir, `${task.id}.json`);
+          const reportPath = path.join(xiaowuInboxDir, "report-smallcalc-implementation-001.json");
+
+          writeJson(taskPath, task);
+          appendRunEvent(runDir, { type: "status", status: "queued", text: `小五写入 FixTask：${taskPath}` });
+          startCcWorker(runId, taskPath, reportPath);
+          sendJson(res, { ok: true, runId, task });
+          return;
         }
-      });
+
+        if (req.method === "POST" && req.url === "/api/xiaowu/final-review") {
+          await readBody(req);
+          const fixTaskBody = readArtifactText("fixtask-smallcalc-v1");
+          const implementationReport = readJsonFile<{ payload?: unknown } | null>(
+            path.join(xiaowuInboxDir, "report-smallcalc-implementation-001.json"),
+            null,
+          );
+
+          if (!fixTaskBody || !implementationReport) {
+            sendJson(res, { error: "FixTask and second ImplementationReport are required before final review." }, 409);
+            return;
+          }
+
+          const body = await llmProvider.complete([
+            {
+              role: "system",
+              content:
+                "你是小五 PM Agent。请基于 FixTask、CC 第二次报告和目标仓库文件快照做真实最终验收。不能编造通过；必须写出证据、风险和结论。输出中文 Markdown。",
+            },
+            {
+              role: "user",
+              content: `FixTask:\n${fixTaskBody}\n\nCC 第二次 ImplementationReport:\n${JSON.stringify(implementationReport, null, 2)}\n\n小五后端复验命令结果:\n${JSON.stringify(runTargetVerification(), null, 2)}\n\n目标仓库文件快照:\n${readTargetRepoSnapshot()}`,
+            },
+          ]);
+          const artifact = writeArtifact("review-smallcalc-final-v1", {
+            stepId: 7,
+            actor: "小五",
+            to: "CC",
+            type: "FinalReviewResult",
+            title: "小五再次验收报告 v1",
+            status: "created",
+            summary: "小五通过真实 LLM 基于 FixTask、CC 第二次报告和仓库快照生成最终验收。",
+            body,
+          });
+          sendJson(res, { ok: true, artifact, llm: llmProvider.info });
+          return;
+        }
+
+        sendJson(res, { error: "Not found" }, 404);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown API error";
+        sendJson(res, { error: message }, 500);
+      }
+    });
     },
   };
 }

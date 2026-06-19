@@ -167,8 +167,12 @@ export default function App() {
     : artifacts.at(-1);
   const hasPrd = artifacts.some((artifact) => artifact.type === "PRD");
   const hasTaskSpec = artifacts.some((artifact) => artifact.type === "TaskSpec");
-  const hasReport = (agentBus?.reports.length ?? 0) > 0;
+  const reports = agentBus?.reports ?? [];
+  const hasReport = reports.some((report) => report.id === "report-smallcalc-mvp-001");
   const hasReview = artifacts.some((artifact) => artifact.type === "ReviewResult");
+  const hasFixTask = artifacts.some((artifact) => artifact.type === "FixTask");
+  const hasImplementationReport = reports.some((report) => report.id === "report-smallcalc-implementation-001");
+  const hasFinalReview = artifacts.some((artifact) => artifact.type === "FinalReviewResult");
 
   const codexEvents = useMemo(
     () =>
@@ -197,16 +201,23 @@ export default function App() {
 
     return [...messageItems, ...eventItems];
   }, [agentBus?.messages, agentBus?.run?.id, codexEvents]);
-  const nextActionLabel = !hasPrd
-    ? "小五创建 PRD"
-    : !hasTaskSpec
-      ? "发送 TaskSpec 给 CC"
-      : hasReport && !hasReview
-        ? "小五验收报告"
-        : agentBus?.run?.status === "running"
-          ? "等待 CC 报告"
-          : "等待真实下一步";
-  const canRunAction = !actionBusy && (!hasPrd || !hasTaskSpec || (hasReport && !hasReview));
+  const nextActionLabel = (() => {
+    if (!hasPrd) return "小五创建 PRD";
+    if (!hasTaskSpec) return "发送 TaskSpec 给 CC";
+    if (!hasReport) return "等待 CC 报告";
+    if (!hasReview) return "小五验收报告";
+    if (!hasFixTask) return "要求 CC 实现 SmallCalc";
+    if (!hasImplementationReport) return "等待 CC 实现报告";
+    if (!hasFinalReview) return "小五再次验收";
+    return "流程已完成";
+  })();
+  const canRunAction =
+    !actionBusy &&
+    (!hasPrd ||
+      !hasTaskSpec ||
+      (hasReport && !hasReview) ||
+      (hasReview && !hasFixTask) ||
+      (hasImplementationReport && !hasFinalReview));
 
   function getStepStatus(step: WorkflowStep): WorkflowStatus {
     if (step.id === 1) return hasPrd ? "done" : "waiting";
@@ -218,6 +229,12 @@ export default function App() {
     }
     if (step.id === 4) return hasReview ? "done" : hasReport ? "active" : "waiting";
     if (step.id === 5) return hasReview ? "failed" : "waiting";
+    if (step.id === 6) {
+      if (hasImplementationReport) return "done";
+      if (hasFixTask) return "active";
+      return hasReview ? "active" : "waiting";
+    }
+    if (step.id === 7) return hasFinalReview ? "approved" : hasImplementationReport ? "active" : "waiting";
     return "waiting";
   }
 
@@ -255,6 +272,10 @@ export default function App() {
         ? "/api/agentbus/tasks/smallcalc"
         : hasReport && !hasReview
           ? "/api/xiaowu/review"
+          : hasReview && !hasFixTask
+            ? "/api/xiaowu/fix-task"
+            : hasImplementationReport && !hasFinalReview
+              ? "/api/xiaowu/final-review"
           : null;
 
     if (!endpoint) return;
@@ -271,6 +292,8 @@ export default function App() {
       if (endpoint === "/api/xiaowu/prd") setCurrentStepIndex(0);
       if (endpoint === "/api/agentbus/tasks/smallcalc") setCurrentStepIndex(1);
       if (endpoint === "/api/xiaowu/review") setCurrentStepIndex(3);
+      if (endpoint === "/api/xiaowu/fix-task") setCurrentStepIndex(5);
+      if (endpoint === "/api/xiaowu/final-review") setCurrentStepIndex(6);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "执行失败");
     } finally {
@@ -292,8 +315,23 @@ export default function App() {
       return;
     }
 
+    if (hasFinalReview) {
+      setCurrentStepIndex(6);
+      return;
+    }
+
+    if (hasImplementationReport) {
+      setCurrentStepIndex(5);
+      return;
+    }
+
+    if (hasFixTask) {
+      setCurrentStepIndex(5);
+      return;
+    }
+
     if (hasReview) {
-      setCurrentStepIndex(4);
+      setCurrentStepIndex(3);
       return;
     }
 
@@ -310,7 +348,17 @@ export default function App() {
     if (hasPrd) {
       setCurrentStepIndex(0);
     }
-  }, [agentBus, currentStepIndex, hasPrd, hasReport, hasReview, hasTaskSpec]);
+  }, [
+    agentBus,
+    currentStepIndex,
+    hasFinalReview,
+    hasFixTask,
+    hasImplementationReport,
+    hasPrd,
+    hasReport,
+    hasReview,
+    hasTaskSpec,
+  ]);
 
   return (
     <main className="app-shell" aria-labelledby="app-title">

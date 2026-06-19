@@ -1,4 +1,6 @@
 /* eslint-disable no-unused-vars */
+import fs from "node:fs";
+import path from "node:path";
 import { spawn } from "node:child_process";
 import readline from "node:readline";
 
@@ -362,6 +364,13 @@ export class CodexAppServerTestRunner implements CcAgentRunner {
   start(task: CcRunnerTask, context: CcRunnerContext): CcRunnerHandle {
     const threadId = `thread-test-${task.runId}`;
     const turnId = `turn-test-${task.runId}`;
+    const taskSpec = JSON.parse(fs.readFileSync(task.taskPath, "utf8")) as {
+      messageId?: string;
+      payload?: { constraints?: { doNotImplementSmallCalcYet?: boolean } };
+    };
+    const didImplementSmallCalc = !taskSpec.payload?.constraints?.doNotImplementSmallCalcYet;
+    const reportId = path.basename(task.reportPath, ".json");
+    const messageId = taskSpec.messageId === "MSG-003" ? "MSG-004" : "MSG-002";
 
     context.updateSnapshot({
       provider: this.provider,
@@ -384,16 +393,18 @@ export class CodexAppServerTestRunner implements CcAgentRunner {
       text: "CC test worker received TaskSpec through Codex App Server.",
     });
     context.writeReport({
-      id: "report-smallcalc-mvp-001",
-      messageId: "MSG-002",
+      id: reportId,
+      messageId,
       from: "CC",
       to: "小五",
       type: "ImplementationReport",
       runId: task.runId,
       status: "submitted",
       payload: {
-        summary: "测试模式：CC 已通过 Codex App Server 调用器收到 TaskSpec。",
-        didImplementSmallCalc: false,
+        summary: didImplementSmallCalc
+          ? "测试模式：CC 已收到 FixTask，并模拟返回已实现 SmallCalc 的报告。"
+          : "测试模式：CC 已通过 Codex App Server 调用器收到 TaskSpec。",
+        didImplementSmallCalc,
       },
     });
     context.updateSnapshot({
