@@ -597,6 +597,11 @@ h3 {
   background: #fff8ea;
 }
 
+.chat-empty.pending {
+  border-color: #9ccab3;
+  background: #eff8f2;
+}
+
 .comm-row,
 .comm-empty {
   display: grid;

@@ -137,6 +137,7 @@ export default function App() {
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
   const [agentBus, setAgentBus] = useState<AgentBusState | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const artifacts = agentBus?.artifacts ?? [];
   const latestArtifact = currentStepIndex >= 0
@@ -212,6 +213,7 @@ export default function App() {
 
   async function resetWorkflow() {
     setCurrentStepIndex(-1);
+    setActionError(null);
 
     try {
       await fetch("/api/agentbus/reset", { method: "POST" });
@@ -233,6 +235,7 @@ export default function App() {
     if (!endpoint) return;
 
     setActionBusy(true);
+    setActionError(null);
     try {
       const response = await fetch(endpoint, { method: "POST" });
       if (!response.ok) {
@@ -244,7 +247,7 @@ export default function App() {
       if (endpoint === "/api/agentbus/tasks/smallcalc") setCurrentStepIndex(1);
       if (endpoint === "/api/xiaowu/review") setCurrentStepIndex(3);
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "执行失败");
+      setActionError(error instanceof Error ? error.message : "执行失败");
     } finally {
       setActionBusy(false);
     }
@@ -386,6 +389,20 @@ export default function App() {
           </div>
 
           <div className="chat-list" aria-label="小五和 CC 会话消息">
+            {actionBusy ? (
+              <article className="chat-empty pending">
+                <strong>小五正在调用真实 LLM</strong>
+                <p>正在请求 `.env.local` 配置的 provider。完成前不会生成任何假产物。</p>
+              </article>
+            ) : null}
+
+            {actionError ? (
+              <article className="chat-empty warning">
+                <strong>小五调用失败</strong>
+                <p>{actionError}</p>
+              </article>
+            ) : null}
+
             {apiError ? (
               <article className="chat-empty warning">
                 <strong>agentbus 暂不可读</strong>
