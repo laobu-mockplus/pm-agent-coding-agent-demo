@@ -5,6 +5,17 @@ import App from "./App";
 
 type TestStage = "empty" | "prd" | "task" | "report" | "review";
 
+const testSettings = {
+  ccPersona: {
+    profileName: "严谨资深工程师",
+    displayName: "CC",
+    executionPersona: "必须真实执行任务。",
+    uiDisplayPersona: "用中文展示关键动作。",
+    communicationStyle: "concise",
+    showTechnicalEvents: false,
+  },
+};
+
 function createAgentBusState(stage: TestStage = "empty") {
   const hasPrd = ["prd", "task", "report", "review"].includes(stage);
   const hasTask = ["task", "report", "review"].includes(stage);
@@ -69,6 +80,7 @@ function createAgentBusState(stage: TestStage = "empty") {
       model: "gpt-5.4-mini",
       configured: true,
     },
+    settings: testSettings,
     messages: hasTask
       ? [
           {
@@ -120,12 +132,14 @@ function createAgentBusState(stage: TestStage = "empty") {
 
 describe("小五工作台", () => {
   let stage: TestStage = "empty";
+  let savedSettings = testSettings;
 
   beforeEach(() => {
     stage = "empty";
+    savedSettings = testSettings;
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: string | URL, init?: { method?: string }) => {
+      vi.fn(async (input: string | URL, init?: { method?: string; body?: unknown }) => {
         const url = String(input);
 
         if (url === "/api/xiaowu/prd" && init?.method === "POST") {
@@ -148,8 +162,13 @@ describe("小五工作台", () => {
           return Response.json({ ok: true });
         }
 
+        if (url === "/api/settings" && init?.method === "POST") {
+          savedSettings = JSON.parse(String(init.body));
+          return Response.json({ ok: true, settings: savedSettings });
+        }
+
         if (url === "/api/agentbus/state") {
-          return Response.json(createAgentBusState(stage));
+          return Response.json({ ...createAgentBusState(stage), settings: savedSettings });
         }
 
         return Response.json({ error: "not found" }, { status: 404 });
@@ -224,5 +243,20 @@ describe("小五工作台", () => {
 
     expect(screen.getByText("尚未生成产出物")).toBeInTheDocument();
     expect(screen.queryByLabelText("当前流程状态")).not.toBeInTheDocument();
+  });
+
+  it("可以打开并保存 Coding Agent 人格设置", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "设置" }));
+    expect(screen.getByRole("heading", { name: "工作台设置" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Coding Agent 人格/ })).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("人格预设"), "test-first");
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+
+    expect(savedSettings.ccPersona.profileName).toBe("测试优先工程师");
+    expect(savedSettings.ccPersona.executionPersona).toContain("测试优先");
   });
 });

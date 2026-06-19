@@ -18,9 +18,21 @@ const ccInboxDir = path.join(agentBusDir, "cc-inbox");
 const xiaowuInboxDir = path.join(agentBusDir, "xiaowu-inbox");
 const artifactsDir = path.join(agentBusDir, "artifacts");
 const runsDir = path.join(agentBusDir, "runs");
+const settingsPath = path.join(agentBusDir, "settings.json");
 const targetRepoDir = path.resolve(rootDir, "../workspaces/smallcalc-app");
 let activeRunner: CcRunnerHandle | null = null;
 const llmProvider = new XiaowuLlmProvider(rootDir);
+
+type XiaowuSettings = {
+  ccPersona: {
+    profileName: string;
+    displayName: string;
+    executionPersona: string;
+    uiDisplayPersona: string;
+    communicationStyle: "concise" | "detailed" | "debug";
+    showTechnicalEvents: boolean;
+  };
+};
 
 type AgentArtifact = {
   id: string;
@@ -50,6 +62,40 @@ function readJsonFile<T>(filePath: string, fallback: T) {
   }
 
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
+}
+
+function defaultSettings(): XiaowuSettings {
+  return {
+    ccPersona: {
+      profileName: "严谨资深工程师",
+      displayName: "CC",
+      executionPersona:
+        "你是 CC，一个严谨的资深 Coding Agent。你必须真实读取任务、真实修改目标仓库、真实运行验证命令，并如实报告成功、失败和阻塞。不得用 mock、占位文件或只补报告冒充完成。",
+      uiDisplayPersona:
+        "在小五工作台中，用简洁中文展示 CC 的关键动作。隐藏对用户无意义的协议事件和长 ID；保留命令执行、文件修改、错误、报告提交和任务完成等关键信息。",
+      communicationStyle: "concise",
+      showTechnicalEvents: false,
+    },
+  };
+}
+
+function readSettings(): XiaowuSettings {
+  const defaults = defaultSettings();
+  const saved = readJsonFile<Partial<XiaowuSettings> | null>(settingsPath, null);
+
+  return {
+    ...defaults,
+    ...saved,
+    ccPersona: {
+      ...defaults.ccPersona,
+      ...(saved?.ccPersona ?? {}),
+    },
+  };
+}
+
+function writeSettings(value: XiaowuSettings) {
+  writeJson(settingsPath, value);
+  return value;
 }
 
 function readJsonFiles(dir: string) {
@@ -255,13 +301,25 @@ function createTaskSpec(
 }
 
 function buildCcPrompt(taskPath: string, reportPath: string, runId: string) {
-  return `你是 CC。你现在被小五通过 Codex App Server 调用器唤起。
+  const settings = readSettings();
+  const persona = settings.ccPersona;
+
+  return `你是 ${persona.displayName}。你现在被小五通过 Codex App Server 调用器唤起。
+
+## Coding Agent 执行能力人格
+
+${persona.executionPersona}
+
+## 对用户可见的沟通方式
+
+${persona.uiDisplayPersona}
 
 请严格读取 TaskSpec，并按 TaskSpec 执行。当前阶段如果 TaskSpec 明确要求不要实现 SmallCalc，就不得实现；如果 TaskSpec 要求实现，则按目标仓库完成实现。
 
 1. 读取 TaskSpec 文件：${taskPath}
 2. 在目标仓库中按 TaskSpec 执行；如果 TaskSpec 要求实现 SmallCalc，就真实创建或修改代码、运行可用的验证命令。
-3. 创建 ImplementationReport JSON 文件：${reportPath}
+3. 执行过程中请用中文输出简短进度，重点说明正在读取任务、修改文件、运行命令、遇到阻塞或提交报告。
+4. 创建 ImplementationReport JSON 文件：${reportPath}
 
 ImplementationReport JSON 必须包含：
 {
@@ -324,7 +382,11 @@ function agentBusPlugin() {
     name: "xiaowu-agentbus-api",
     configureServer(server: import("vite").ViteDevServer) {
       server.middlewares.use(async (req, res, next) => {
-        if (!req.url?.startsWith("/api/agentbus") && !req.url?.startsWith("/api/xiaowu")) {
+        if (
+          !req.url?.startsWith("/api/agentbus") &&
+          !req.url?.startsWith("/api/xiaowu") &&
+          !req.url?.startsWith("/api/settings")
+        ) {
           next();
           return;
         }
@@ -335,7 +397,28 @@ function agentBusPlugin() {
         ensureDir(runsDir);
 
         try {
-        if (req.method === "GET" && req.url === "/api/agentbus/state") {
+          if (req.method === "GET" && req.url === "/api/settings") {
+            sendJson(res, readSettings());
+            return;
+          }
+
+          if (req.method === "POST" && req.url === "/api/settings") {
+            const body = await readBody(req);
+            const incoming = JSON.parse(body || "{}") as Partial<XiaowuSettings>;
+            const defaults = defaultSettings();
+            const settings = writeSettings({
+              ...defaults,
+              ...incoming,
+              ccPersona: {
+                ...defaults.ccPersona,
+                ...(incoming.ccPersona ?? {}),
+              },
+            });
+            sendJson(res, { ok: true, settings });
+            return;
+          }
+
+          if (req.method === "GET" && req.url === "/api/agentbus/state") {
           const tasks = readJsonFiles(ccInboxDir);
           const reports = readJsonFiles(xiaowuInboxDir);
           const artifacts = readArtifacts();
@@ -354,6 +437,7 @@ function agentBusPlugin() {
             reports,
             artifacts,
             llm: llmProvider.info,
+            settings: readSettings(),
             messages: [
               ...artifacts.map((artifact) => ({
                 id: artifact.id,

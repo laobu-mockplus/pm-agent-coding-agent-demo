@@ -45,7 +45,7 @@ test("小五工作台不会预置结果，必须先真实创建 PRD 再发送 Ta
   await expect(conversation.getByText("目标：SmallCalc")).toBeVisible();
   await expect(page.getByRole("heading", { name: "SmallCalc TaskSpec v1" })).toBeVisible();
   await expect(page.getByLabel("Codex App Server 状态").getByText("Codex App Server")).toBeVisible();
-  await expect(conversation.getByText("thread/started")).toBeVisible();
+  await expect(conversation.getByText("CC 会话已建立")).toBeVisible();
   await expect(
     conversation.getByText("CC test worker received TaskSpec through Codex App Server."),
   ).toBeVisible();
