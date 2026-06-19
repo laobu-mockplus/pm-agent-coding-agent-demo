@@ -4,5 +4,7 @@ playwright-report
 test-results
 .agentbus/runs/*
 !.agentbus/runs/.gitkeep
+.agentbus/*.json
+.agentbus/*.md
 *.tsbuildinfo
 .DS_Store
