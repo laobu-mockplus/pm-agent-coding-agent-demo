@@ -28,9 +28,37 @@ acceptance until AC-6 is complete.
 `;
 
 const bodyFile = writeTempFile("xiaowu-review-request-changes.md", body);
-run("gh", ["pr", "review", String(pr.number), "--request-changes", "--body-file", bodyFile], {
-  stdio: "inherit",
-});
+
+let channel = "pull_request_review";
+try {
+  run("gh", ["pr", "review", String(pr.number), "--request-changes", "--body-file", bodyFile], {
+    stdio: "inherit",
+  });
+} catch {
+  channel = "pull_request_comment";
+  console.warn(
+    "GitHub does not allow the PR author to request changes on their own PR. XiaoWu is falling back to a PR comment plus label.",
+  );
+  for (const label of ["xiaowu:changes-requested"]) {
+    try {
+      run("gh", [
+        "label",
+        "create",
+        label,
+        "--color",
+        "d73a4a",
+        "--description",
+        "XiaoWu requested changes",
+      ]);
+    } catch {
+      // Label already exists.
+    }
+  }
+  run("gh", ["pr", "comment", String(pr.number), "--body-file", bodyFile], { stdio: "inherit" });
+  run("gh", ["pr", "edit", String(pr.number), "--add-label", "xiaowu:changes-requested"], {
+    stdio: "inherit",
+  });
+}
 
 writeLatest({
   ...latest,
@@ -39,8 +67,13 @@ writeLatest({
   xiaowuReview: {
     decision: "changes_requested",
     failedAcceptanceCriteria: ["AC-6"],
+    channel,
   },
 });
-appendEvent("XIAOWU_REQUESTED_CHANGES", { pr: pr.url, failedAcceptanceCriteria: ["AC-6"] });
+appendEvent("XIAOWU_REQUESTED_CHANGES", {
+  pr: pr.url,
+  failedAcceptanceCriteria: ["AC-6"],
+  channel,
+});
 
 console.log(`XiaoWu requested changes on PR: ${pr.url}`);

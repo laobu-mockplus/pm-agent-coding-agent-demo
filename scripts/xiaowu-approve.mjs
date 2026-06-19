@@ -34,9 +34,36 @@ SmallCalc MVP is approved.
 `;
 
 const bodyFile = writeTempFile("xiaowu-approve.md", body);
-run("gh", ["pr", "review", String(pr.number), "--approve", "--body-file", bodyFile], {
-  stdio: "inherit",
-});
+let channel = "pull_request_review";
+try {
+  run("gh", ["pr", "review", String(pr.number), "--approve", "--body-file", bodyFile], {
+    stdio: "inherit",
+  });
+} catch {
+  channel = "pull_request_comment";
+  console.warn(
+    "GitHub does not allow the PR author to approve their own PR. XiaoWu is falling back to a PR comment plus label.",
+  );
+  for (const label of ["xiaowu:approved"]) {
+    try {
+      run("gh", [
+        "label",
+        "create",
+        label,
+        "--color",
+        "2da44e",
+        "--description",
+        "XiaoWu approved the PR",
+      ]);
+    } catch {
+      // Label already exists.
+    }
+  }
+  run("gh", ["pr", "comment", String(pr.number), "--body-file", bodyFile], { stdio: "inherit" });
+  run("gh", ["pr", "edit", String(pr.number), "--add-label", "xiaowu:approved"], {
+    stdio: "inherit",
+  });
+}
 
 writeLatest({
   ...latest,
@@ -44,8 +71,9 @@ writeLatest({
   status: "accepted",
   xiaowuReview: {
     decision: "approved",
+    channel,
   },
 });
-appendEvent("XIAOWU_APPROVED", { pr: pr.url });
+appendEvent("XIAOWU_APPROVED", { pr: pr.url, channel });
 
 console.log(`XiaoWu approved PR: ${pr.url}`);
