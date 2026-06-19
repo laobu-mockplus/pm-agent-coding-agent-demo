@@ -65,6 +65,14 @@ try {
   });
 }
 
+try {
+  run("gh", ["pr", "edit", String(pr.number), "--remove-label", "xiaowu:changes-requested"], {
+    stdio: "inherit",
+  });
+} catch {
+  // The label may already be absent, depending on the review channel.
+}
+
 writeLatest({
   ...latest,
   pr,
