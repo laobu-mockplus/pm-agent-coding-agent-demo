@@ -53,9 +53,9 @@ runInteractive("codex", [
   "exec",
   "--cd",
   rootDir,
-  "--ask-for-approval",
+  "-a",
   "never",
-  "--sandbox",
+  "-s",
   "danger-full-access",
   mode === "first" ? firstPrompt : fixPrompt,
 ]);
