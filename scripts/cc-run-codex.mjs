@@ -50,13 +50,13 @@ appendEvent(mode === "first" ? "CC_FIRST_PASS_STARTED" : "CC_FIX_PASS_STARTED", 
 });
 
 runInteractive("codex", [
-  "exec",
-  "--cd",
-  rootDir,
   "-a",
   "never",
   "-s",
   "danger-full-access",
+  "exec",
+  "--cd",
+  rootDir,
   mode === "first" ? firstPrompt : fixPrompt,
 ]);
 
