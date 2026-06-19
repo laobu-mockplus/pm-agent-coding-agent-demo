@@ -1,16 +1,15 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-
-type AgentBusEvent = {
-  at: string;
-  type: string;
-  text?: string;
-  status?: string;
-  code?: number | null;
-};
+import {
+  CodexAppServerRunner,
+  CodexAppServerTestRunner,
+  type AgentBusEvent,
+  type CcRunnerHandle,
+  type CcRunnerSnapshot,
+} from "./server/cc-runners";
 
 const rootDir = process.cwd();
 const agentBusDir = path.join(rootDir, ".agentbus");
@@ -18,7 +17,7 @@ const ccInboxDir = path.join(agentBusDir, "cc-inbox");
 const xiaowuInboxDir = path.join(agentBusDir, "xiaowu-inbox");
 const runsDir = path.join(agentBusDir, "runs");
 const targetRepoDir = path.resolve(rootDir, "../workspaces/smallcalc-app");
-let activeWorker: ChildProcessWithoutNullStreams | null = null;
+let activeRunner: CcRunnerHandle | null = null;
 
 function ensureDir(dir: string) {
   fs.mkdirSync(dir, { recursive: true });
@@ -27,6 +26,14 @@ function ensureDir(dir: string) {
 function writeJson(filePath: string, value: unknown) {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function readJsonFile<T>(filePath: string, fallback: T) {
+  if (!fs.existsSync(filePath)) {
+    return fallback;
+  }
+
+  return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
 }
 
 function readJsonFiles(dir: string) {
@@ -44,6 +51,14 @@ function appendRunEvent(runDir: string, event: Omit<AgentBusEvent, "at">) {
     path.join(runDir, "events.jsonl"),
     `${JSON.stringify({ at: new Date().toISOString(), ...event })}\n`,
   );
+}
+
+function writeRunSnapshot(runDir: string, snapshot: CcRunnerSnapshot) {
+  writeJson(path.join(runDir, "runner.json"), snapshot);
+}
+
+function readRunSnapshot(runDir: string) {
+  return readJsonFile<CcRunnerSnapshot | null>(path.join(runDir, "runner.json"), null);
 }
 
 function readRunEvents(runDir: string) {
@@ -72,7 +87,7 @@ function ensureTargetRepo() {
   }
 
   if (!fs.existsSync(path.join(targetRepoDir, ".git"))) {
-    spawn("git", ["init"], { cwd: targetRepoDir });
+    spawnSync("git", ["init"], { cwd: targetRepoDir, stdio: "ignore" });
   }
 }
 
@@ -109,10 +124,19 @@ function createTaskSpec(runId: string) {
       baseBranch: "main",
       workBranch: "cc/smallcalc-mvp",
     },
+    ccRunner: {
+      provider: "codex",
+      adapter: "Codex App Server",
+      protocol: "json-rpc/stdio",
+    },
     payload: {
       product: "SmallCalc",
-      goal: "验证小五能通过真实 inbox 命令 CC。当前探针不实现 SmallCalc 程序。",
-      acceptanceCriteria: ["CC 必须读取 TaskSpec", "CC 必须写回 ImplementationReport", "UI 必须显示执行日志"],
+      goal: "验证小五能通过 Codex App Server 调用器启动并管理 CC。当前探针不实现 SmallCalc 程序。",
+      acceptanceCriteria: [
+        "CC 必须通过 Codex App Server thread/turn 接收任务",
+        "CC 必须写回 ImplementationReport",
+        "UI 必须显示 Codex App Server 结构化事件",
+      ],
       constraints: {
         doNotImplementSmallCalcYet: true,
         writeReportToXiaowuInbox: true,
@@ -122,7 +146,7 @@ function createTaskSpec(runId: string) {
 }
 
 function buildCcPrompt(taskPath: string, reportPath: string, runId: string) {
-  return `你是 CC。你现在被小五通过真实 .agentbus inbox 唤起。
+  return `你是 CC。你现在被小五通过 Codex App Server 调用器唤起。
 
 请严格执行这个通信探针，不要实现 SmallCalc 程序，不要创建 PR，不要修改目标仓库业务代码。
 
@@ -152,51 +176,36 @@ function startCcWorker(runId: string, taskPath: string, reportPath: string) {
   const runDir = path.join(runsDir, runId);
   const mode = process.env.XIAOWU_CC_MODE ?? "real";
 
-  appendRunEvent(runDir, { type: "status", status: "starting", text: `启动 CC worker，模式：${mode}` });
-
-  if (mode === "test") {
-    appendRunEvent(runDir, { type: "stdout", text: "CC test worker received TaskSpec." });
-    writeJson(reportPath, {
-      id: "report-smallcalc-mvp-001",
-      messageId: "MSG-002",
-      from: "CC",
-      to: "小五",
-      type: "ImplementationReport",
-      runId,
-      status: "submitted",
-      payload: {
-        summary: "测试模式：CC 已通过 agentbus 收到 TaskSpec。",
-        didImplementSmallCalc: false,
-      },
-    });
-    appendRunEvent(runDir, { type: "status", status: "completed", text: "测试模式报告已写回。" });
-    return;
-  }
-
+  appendRunEvent(runDir, { type: "status", status: "starting", text: `启动 CC 调用器：Codex App Server，模式：${mode}` });
   const prompt = buildCcPrompt(taskPath, reportPath, runId);
-  activeWorker = spawn("codex", ["-a", "never", "-s", "danger-full-access", "exec", "--cd", targetRepoDir, prompt], {
-    cwd: targetRepoDir,
+  const runner = mode === "test" ? new CodexAppServerTestRunner() : new CodexAppServerRunner();
+  writeRunSnapshot(runDir, {
+    provider: runner.provider,
+    adapter: runner.adapter,
+    protocol: runner.protocol,
+    mode,
+    status: "starting",
   });
-  activeWorker.stdin.end();
 
-  activeWorker.stdout.on("data", (chunk) => {
-    appendRunEvent(runDir, { type: "stdout", text: chunk.toString() });
-  });
-  activeWorker.stderr.on("data", (chunk) => {
-    appendRunEvent(runDir, { type: "stderr", text: chunk.toString() });
-  });
-  activeWorker.on("error", (error) => {
-    appendRunEvent(runDir, { type: "error", status: "failed", text: error.message });
-  });
-  activeWorker.on("close", (code) => {
-    appendRunEvent(runDir, {
-      type: "exit",
-      status: code === 0 ? "completed" : "failed",
-      code,
-      text: `CC worker exited with code ${code}`,
-    });
-    activeWorker = null;
-  });
+  activeRunner = runner.start(
+    { runId, targetRepoDir, taskPath, reportPath, prompt },
+    {
+      appendEvent: (event) => appendRunEvent(runDir, event),
+      writeReport: (value) => writeJson(reportPath, value),
+      updateSnapshot: (snapshot) => {
+        const previous = readRunSnapshot(runDir);
+        writeRunSnapshot(runDir, {
+          provider: runner.provider,
+          adapter: runner.adapter,
+          protocol: runner.protocol,
+          mode,
+          status: "starting",
+          ...(previous ?? {}),
+          ...snapshot,
+        });
+      },
+    },
+  );
 }
 
 function agentBusPlugin() {
@@ -223,6 +232,7 @@ function agentBusPlugin() {
           const latestRunId = runIds.at(-1);
           const runDir = latestRunId ? path.join(runsDir, latestRunId) : null;
           const events = runDir ? readRunEvents(runDir) : [];
+          const runner = runDir ? readRunSnapshot(runDir) : null;
           const latestExit = [...events].reverse().find((event) => event.type === "exit" || event.type === "error");
 
           sendJson(res, {
@@ -234,14 +244,15 @@ function agentBusPlugin() {
                 from: task.from,
                 to: task.to,
                 type: task.type,
-                channel: task.channel,
-                status: task.status,
-                payload: [
-                  `目标：${task.payload.product}`,
-                  `目标仓库：${task.targetRepo.localPath}`,
-                  `约束：不提前实现 SmallCalc = ${task.payload.constraints.doNotImplementSmallCalcYet}`,
-                ],
-              })),
+                  channel: task.channel,
+                  status: task.status,
+                  payload: [
+                    `目标：${task.payload.product}`,
+                    `目标仓库：${task.targetRepo.localPath}`,
+                    `CC 调用器：${task.ccRunner?.adapter ?? "Codex App Server"}`,
+                    `约束：不提前实现 SmallCalc = ${task.payload.constraints.doNotImplementSmallCalcYet}`,
+                  ],
+                })),
               ...reports.map((report) => ({
                 id: report.messageId,
                 from: report.from,
@@ -257,6 +268,7 @@ function agentBusPlugin() {
                   id: latestRunId,
                   status: latestExit?.status ?? "running",
                   targetRepo: targetRepoDir,
+                  runner,
                   events,
                 }
               : null,
@@ -265,8 +277,8 @@ function agentBusPlugin() {
         }
 
         if (req.method === "POST" && req.url === "/api/agentbus/reset") {
-          activeWorker?.kill();
-          activeWorker = null;
+          activeRunner?.cancel();
+          activeRunner = null;
           fs.rmSync(ccInboxDir, { recursive: true, force: true });
           fs.rmSync(xiaowuInboxDir, { recursive: true, force: true });
           fs.rmSync(runsDir, { recursive: true, force: true });

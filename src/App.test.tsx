@@ -23,7 +23,32 @@ function createAgentBusState(hasTask = false) {
           id: "run-test",
           status: "running",
           targetRepo: "/tmp/smallcalc-app",
-          events: [{ at: "2026-06-19T00:00:00.000Z", type: "stdout", text: "CC received TaskSpec." }],
+          runner: {
+            provider: "codex",
+            adapter: "Codex App Server",
+            protocol: "json-rpc/stdio",
+            mode: "test",
+            status: "running",
+            threadId: "thread-test",
+            turnId: "turn-test",
+          },
+          events: [
+            {
+              at: "2026-06-19T00:00:00.000Z",
+              type: "codex-event",
+              method: "turn/started",
+              threadId: "thread-test",
+              turnId: "turn-test",
+              text: "turn turn-test: inProgress",
+            },
+            {
+              at: "2026-06-19T00:00:01.000Z",
+              type: "codex-event",
+              method: "item/started",
+              itemType: "agentMessage",
+              text: "CC test worker received TaskSpec through Codex App Server.",
+            },
+          ],
         }
       : null,
   };
@@ -95,7 +120,14 @@ describe("小五工作台", () => {
     expect(within(communication).getByText("CC")).toBeInTheDocument();
     expect(within(communication).getByText("目标：SmallCalc")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "CC 执行台" })).toBeInTheDocument();
-    expect(screen.getByText("CC received TaskSpec.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Codex App Server" })).toBeInTheDocument();
+    expect(screen.getByText("json-rpc/stdio")).toBeInTheDocument();
+    expect(screen.getByText("thread-test")).toBeInTheDocument();
+    expect(
+      within(screen.getByLabelText("Codex App Server 结构化事件")).getByText(
+        /CC test worker received TaskSpec through Codex App Server/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("可以按 7 个步骤逐步推进到最终通过", async () => {

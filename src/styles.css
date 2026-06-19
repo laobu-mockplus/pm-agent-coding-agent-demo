@@ -507,6 +507,97 @@ h3 {
   overflow-y: auto;
 }
 
+.codex-console {
+  display: grid;
+  gap: 9px;
+  border: 1px solid #dae2d7;
+  border-radius: 7px;
+  padding: 9px;
+  background: #ffffff;
+}
+
+.codex-console-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.codex-console-head span {
+  border: 1px solid #c9d7cf;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: #eff8f2;
+  color: #116c48;
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.codex-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.codex-metrics div {
+  min-width: 0;
+  border: 1px solid #edf1ea;
+  border-radius: 6px;
+  padding: 7px;
+  background: #f8faf5;
+}
+
+.codex-metrics dt {
+  color: #6b756b;
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.codex-metrics dd {
+  overflow: hidden;
+  margin: 3px 0 0;
+  color: #202723;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codex-events {
+  display: grid;
+  gap: 5px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.codex-event {
+  display: grid;
+  grid-template-columns: minmax(74px, 0.38fr) minmax(0, 1fr);
+  gap: 7px;
+  border-radius: 6px;
+  padding: 6px 7px;
+  background: #f4f7f1;
+  color: #303a34;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.codex-event span {
+  overflow: hidden;
+  color: #1d7a5d;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codex-event p {
+  overflow-wrap: anywhere;
+}
+
 .run-event {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);

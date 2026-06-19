@@ -18,7 +18,12 @@ test("小五工作台可以逐步演示不通过到通过", async ({ page }) => 
   await expect(communication.getByText("TaskSpec", { exact: true })).toBeVisible();
   await expect(communication.getByText("目标：SmallCalc")).toBeVisible();
   await expect(page.getByRole("heading", { name: "CC 执行台" })).toBeVisible();
-  await expect(page.getByLabel("CC 执行过程消息").getByText("CC test worker received TaskSpec.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Codex App Server" })).toBeVisible();
+  await expect(page.getByText("json-rpc/stdio")).toBeVisible();
+  await expect(page.getByLabel("Codex App Server 结构化事件").getByText("thread/started")).toBeVisible();
+  await expect(
+    page.getByLabel("CC 执行过程消息").getByText("CC test worker received TaskSpec through Codex App Server."),
+  ).toBeVisible();
 
   for (let index = 0; index < 3; index += 1) {
     await page.getByRole("button", { name: "执行下一步" }).click();

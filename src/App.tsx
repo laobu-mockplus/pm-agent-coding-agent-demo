@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
-// 小五工作台的单页演示入口：当前阶段只模拟流程状态，不提前生成 SmallCalc 程序。
-// 后续接入真实编排时，应由小五发出 TaskSpec 后再触发 CC 运行并写回真实记录。
+// 小五工作台的单页演示入口：小五先发 TaskSpec，再由 CC 调用器启动真实 Coding Agent。
+// 当前默认 CC 实现是 Codex App Server；agentbus 仍保留为业务消息和审计记录层。
 type WorkflowStatus = "waiting" | "active" | "done" | "failed" | "approved";
 
 type WorkflowStep = {
@@ -33,6 +33,10 @@ type RunEvent = {
   text?: string;
   status?: string;
   code?: number | null;
+  method?: string;
+  threadId?: string;
+  turnId?: string;
+  itemType?: string;
 };
 
 type AgentBusState = {
@@ -41,6 +45,16 @@ type AgentBusState = {
     id: string;
     status: string;
     targetRepo: string;
+    runner: {
+      provider: string;
+      adapter: string;
+      protocol: string;
+      mode: string;
+      status: string;
+      threadId?: string;
+      turnId?: string;
+      pid?: number;
+    } | null;
     events: RunEvent[];
   } | null;
 };
@@ -62,21 +76,21 @@ const workflowSteps: WorkflowStep[] = [
     title: "小五给 CC 安排 MVP 任务",
     actor: "小五",
     statusAfterRun: "done",
-    summary: "小五把 PRD 转成 TaskSpec，并通过真实 .agentbus inbox 发送给 CC。",
+    summary: "小五把 PRD 转成 TaskSpec，并通过 CC 调用器交给 Codex App Server。",
     artifactTitle: "TaskSpec",
-    artifactBody: "本轮先验证通信链路：CC 必须读取 TaskSpec，输出执行过程，并写回 ImplementationReport。",
-    evidence: [".agentbus/cc-inbox", "任务类型：communication probe", "指定 Coding Agent：Codex"],
-    result: "小五已写入真实 TaskSpec，orchestrator 开始拉起 CC。",
+    artifactBody: "本轮先验证调用器链路：CC 必须通过 Codex App Server thread/turn 接收任务，并写回 ImplementationReport。",
+    evidence: [".agentbus/cc-inbox", "调用器：Codex App Server", "协议：JSON-RPC stdio"],
+    result: "小五已写入真实 TaskSpec，orchestrator 开始通过 Codex App Server 管理 CC。",
   },
   {
     id: 3,
     title: "CC 执行任务并提交报告",
     actor: "CC",
     statusAfterRun: "done",
-    summary: "CC 由 orchestrator 拉起，读取 TaskSpec，并把真实报告写回小五 inbox。",
+    summary: "CC 由 Codex App Server thread/turn 管理，读取 TaskSpec，并把真实报告写回小五 inbox。",
     artifactTitle: "ImplementationReport",
     artifactBody: "本轮报告只证明通信和执行链路：CC 已读到任务，未实现 SmallCalc，等待小五验收链路。",
-    evidence: [".agentbus/xiaowu-inbox", "CC stdout/stderr 已捕获", "run events 已写入"],
+    evidence: [".agentbus/xiaowu-inbox", "Codex thread/turn 已捕获", "结构化 item events 已写入"],
     result: "CC 报告已提交，等待小五验收通信链路。",
   },
   {
@@ -86,8 +100,8 @@ const workflowSteps: WorkflowStep[] = [
     statusAfterRun: "active",
     summary: "小五先验收通信链路是否成立，再决定是否进入真实 SmallCalc 实现。",
     artifactTitle: "验收检查表",
-    artifactBody: "通信链路要求：TaskSpec 真实落盘、CC 真实执行、过程日志可见、ImplementationReport 真实写回。",
-    evidence: ["检查 cc-inbox", "检查 run events", "检查 xiaowu-inbox"],
+    artifactBody: "通信链路要求：TaskSpec 真实落盘、Codex App Server 真实启动、结构化事件可见、ImplementationReport 真实写回。",
+    evidence: ["检查 cc-inbox", "检查 Codex thread/turn", "检查 xiaowu-inbox"],
     result: "发现不合格项，准备给出不通过判定。",
   },
   {
@@ -154,6 +168,10 @@ export default function App() {
   const progress = Math.round((completedCount / workflowSteps.length) * 100);
 
   const visibleMessages = useMemo(() => [...(agentBus?.messages ?? [])].reverse(), [agentBus?.messages]);
+  const codexEvents = useMemo(
+    () => (agentBus?.run?.events ?? []).filter((event) => event.type === "codex-event" || event.type === "codex-request"),
+    [agentBus?.run?.events],
+  );
   const canGoNext = currentStepIndex < workflowSteps.length - 1;
   const visibleStatus = currentStep ? statusLabel(currentStep.statusAfterRun) : "待小五发令";
   const nextActionLabel =
@@ -406,12 +424,62 @@ export default function App() {
                 </div>
                 <p className="channel">{agentBus.run.id}</p>
                 <p className="channel">{agentBus.run.targetRepo}</p>
+                <section className="codex-console" aria-labelledby="codex-console-title">
+                  <div className="codex-console-head">
+                    <div>
+                      <p className="eyebrow">Codex</p>
+                      <h3 id="codex-console-title">Codex App Server</h3>
+                    </div>
+                    <span>{agentBus.run.runner?.mode ?? "unknown"}</span>
+                  </div>
+                  <dl className="codex-metrics">
+                    <div>
+                      <dt>Provider</dt>
+                      <dd>{agentBus.run.runner?.provider ?? "codex"}</dd>
+                    </div>
+                    <div>
+                      <dt>Adapter</dt>
+                      <dd>{agentBus.run.runner?.adapter ?? "Codex App Server"}</dd>
+                    </div>
+                    <div>
+                      <dt>Protocol</dt>
+                      <dd>{agentBus.run.runner?.protocol ?? "json-rpc/stdio"}</dd>
+                    </div>
+                    <div>
+                      <dt>Status</dt>
+                      <dd>{agentBus.run.runner?.status ?? agentBus.run.status}</dd>
+                    </div>
+                    <div>
+                      <dt>Thread</dt>
+                      <dd>{agentBus.run.runner?.threadId ?? "pending"}</dd>
+                    </div>
+                    <div>
+                      <dt>Turn</dt>
+                      <dd>{agentBus.run.runner?.turnId ?? "pending"}</dd>
+                    </div>
+                  </dl>
+                  <div className="codex-events" aria-label="Codex App Server 结构化事件">
+                    {codexEvents.length > 0 ? (
+                      codexEvents.slice(-10).map((event, index) => (
+                        <article className="codex-event" key={`${event.at}-${index}`}>
+                          <span>{event.method ?? event.type}</span>
+                          <p>{event.itemType ? `${event.itemType} · ${event.text ?? ""}` : event.text ?? event.status}</p>
+                        </article>
+                      ))
+                    ) : (
+                      <article className="codex-event">
+                        <span>waiting</span>
+                        <p>等待 Codex App Server 事件。</p>
+                      </article>
+                    )}
+                  </div>
+                </section>
                 <div className="run-events" aria-label="CC 执行过程消息">
                   {agentBus.run.events.length > 0 ? (
                     agentBus.run.events.map((event, index) => (
                       <article className={`run-event ${event.type}`} key={`${event.at}-${index}`}>
-                        <span>{event.type}</span>
-                        <p>{event.text ?? event.status ?? `exit code ${event.code}`}</p>
+                        <span>{event.method ?? event.type}</span>
+                        <p>{event.itemType ? `${event.itemType} · ${event.text ?? ""}` : event.text ?? event.status ?? `exit code ${event.code}`}</p>
                       </article>
                     ))
                   ) : (
