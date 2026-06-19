@@ -549,9 +549,7 @@ export default function App() {
     <main className="app-shell" aria-labelledby="app-title">
       <header className="topbar">
         <div className="brand-block">
-          <span className="brand-mark" aria-hidden="true">
-            小五
-          </span>
+          <img className="brand-mark" src="/xiaowu-logo.png" alt="" aria-hidden="true" />
           <div>
             <h1 id="app-title">小五工作台：SmallCalc MVP 验收演示</h1>
           </div>

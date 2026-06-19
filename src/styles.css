@@ -76,19 +76,14 @@ button {
 }
 
 .brand-mark {
-  display: grid;
   flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border: 1px solid #171a2e;
-  border-radius: 6px;
-  background:
-    linear-gradient(135deg, #171a2e 0 48%, #3157ff 49% 73%, #ff5a3d 74% 100%);
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(49, 87, 255, 0.28);
-  font-size: 0.86rem;
-  font-weight: 800;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(49, 87, 255, 0.18);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 10px 22px rgba(49, 87, 255, 0.18);
+  object-fit: cover;
 }
 
 .eyebrow {
