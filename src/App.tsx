@@ -8,12 +8,6 @@ type WorkflowStep = {
   id: number;
   title: string;
   actor: "小五" | "CC";
-  statusAfterRun: WorkflowStatus;
-  summary: string;
-  artifactTitle: string;
-  artifactBody: string;
-  evidence: string[];
-  result: string;
 };
 
 type CommunicationMessage = {
@@ -40,6 +34,15 @@ type RunEvent = {
 };
 
 type AgentBusState = {
+  artifacts: Artifact[];
+  tasks: Array<{ id: string; type: string; status: string }>;
+  reports: Array<{ id: string; type: string; status: string; payload?: { summary?: string } }>;
+  llm: {
+    provider: string;
+    baseUrl: string;
+    model: string;
+    configured: boolean;
+  };
   messages: CommunicationMessage[];
   run: {
     id: string;
@@ -59,6 +62,18 @@ type AgentBusState = {
   } | null;
 };
 
+type Artifact = {
+  id: string;
+  stepId: number;
+  actor: "小五" | "CC";
+  type: string;
+  title: string;
+  status: string;
+  summary: string;
+  body: string;
+  createdAt: string;
+};
+
 type ChatItem = {
   id: string;
   speaker: "小五" | "CC" | "Codex";
@@ -73,88 +88,38 @@ const workflowSteps: WorkflowStep[] = [
     id: 1,
     title: "小五创建 SmallCalc PRD",
     actor: "小五",
-    statusAfterRun: "done",
-    summary: "把“做一个计算器 app”的意图整理成产品目标、范围和验收标准。",
-    artifactTitle: "PRD v0.1",
-    artifactBody: "SmallCalc 是一个基础计算器 MVP，需要支持四则运算、小数、清空、退格、历史记录和键盘输入。",
-    evidence: ["docs/smallcalc-prd.md", "验收标准 AC-1 到 AC-8 已定义", "目标应用：SmallCalc"],
-    result: "小五已生成 PRD，尚未产生 SmallCalc 程序代码。",
   },
   {
     id: 2,
     title: "小五给 CC 安排 MVP 任务",
     actor: "小五",
-    statusAfterRun: "done",
-    summary: "小五把 PRD 转成 TaskSpec，并通过 CC 调用器交给 Codex App Server。",
-    artifactTitle: "TaskSpec",
-    artifactBody: "本轮先验证调用器链路：CC 必须通过 Codex App Server thread/turn 接收任务，并写回 ImplementationReport。",
-    evidence: [".agentbus/cc-inbox", "调用器：Codex App Server", "协议：JSON-RPC stdio"],
-    result: "小五已写入真实 TaskSpec，orchestrator 开始通过 Codex App Server 管理 CC。",
   },
   {
     id: 3,
     title: "CC 执行任务并提交报告",
     actor: "CC",
-    statusAfterRun: "done",
-    summary: "CC 由 Codex App Server thread/turn 管理，读取 TaskSpec，并把真实报告写回小五 inbox。",
-    artifactTitle: "ImplementationReport",
-    artifactBody: "本轮报告只证明通信和执行链路：CC 已读到任务，未实现 SmallCalc，等待小五验收链路。",
-    evidence: [".agentbus/xiaowu-inbox", "Codex thread/turn 已捕获", "结构化 item events 已写入"],
-    result: "CC 报告已提交，等待小五验收通信链路。",
   },
   {
     id: 4,
     title: "小五第一次验收",
     actor: "小五",
-    statusAfterRun: "active",
-    summary: "小五先验收通信链路是否成立，再决定是否进入真实 SmallCalc 实现。",
-    artifactTitle: "验收检查表",
-    artifactBody: "通信链路要求：TaskSpec 真实落盘、Codex App Server 真实启动、结构化事件可见、ImplementationReport 真实写回。",
-    evidence: ["检查 cc-inbox", "检查 Codex thread/turn", "检查 xiaowu-inbox"],
-    result: "发现不合格项，准备给出不通过判定。",
   },
   {
     id: 5,
     title: "小五判定不通过并列出不合格项",
     actor: "小五",
-    statusAfterRun: "failed",
-    summary: "小五在 PR 上给出 changes requested，并明确 CC 必须修复 AC-6。",
-    artifactTitle: "XiaoWu PM Review",
-    artifactBody: "不通过项：AC-6 Keyboard input。要求补齐数字键、小数点、运算符、Enter、Backspace、Escape。",
-    evidence: ["PR comment: Changes Requested", "label: xiaowu:changes-requested", "失败原因可追踪"],
-    result: "验收不通过，CC 进入修复。",
   },
   {
     id: 6,
     title: "CC 根据验收结果修复并再次提交",
     actor: "CC",
-    statusAfterRun: "done",
-    summary: "CC 补齐键盘输入，并把键盘操作复用到同一套计算器逻辑。",
-    artifactTitle: "第二次 CC Implementation Report",
-    artifactBody: "新增 KeyboardEvent.key 到 CalculatorButton 的映射，补充 AC-6 测试，PR body 更新为全 AC 通过。",
-    evidence: ["模拟修复提交", "模拟 npm test：passed", "模拟 npm run build：passed", "AC-6 测试已覆盖"],
-    result: "CC 修复报告已提交，等待小五最终验收。",
   },
   {
     id: 7,
     title: "小五再次验收并通过",
     actor: "小五",
-    statusAfterRun: "approved",
-    summary: "小五重新运行测试和构建，确认 8 条 AC 全部通过。",
-    artifactTitle: "XiaoWu PM Review: Approved",
-    artifactBody: "SmallCalc MVP is approved。模拟 PR 进入 xiaowu:approved 状态。",
-    evidence: ["模拟 npm test：passed", "模拟 npm run build：passed", "模拟 PR comment: Approved", "label: xiaowu:approved"],
-    result: "流程完成，小五 PM Agent demo 通过。",
   },
 ];
-
-function getStepStatus(stepIndex: number, currentStepIndex: number): WorkflowStatus {
-  if (stepIndex > currentStepIndex) {
-    return "waiting";
-  }
-
-  return workflowSteps[stepIndex].statusAfterRun;
-}
 
 function statusLabel(status: WorkflowStatus) {
   const labels: Record<WorkflowStatus, string> = {
@@ -172,7 +137,15 @@ export default function App() {
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
   const [agentBus, setAgentBus] = useState<AgentBusState | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  const currentStep = currentStepIndex >= 0 ? workflowSteps[currentStepIndex] : null;
+  const [actionBusy, setActionBusy] = useState(false);
+  const artifacts = agentBus?.artifacts ?? [];
+  const latestArtifact = currentStepIndex >= 0
+    ? [...artifacts].reverse().find((artifact) => artifact.stepId === workflowSteps[currentStepIndex].id)
+    : artifacts.at(-1);
+  const hasPrd = artifacts.some((artifact) => artifact.type === "PRD");
+  const hasTaskSpec = artifacts.some((artifact) => artifact.type === "TaskSpec");
+  const hasReport = (agentBus?.reports.length ?? 0) > 0;
+  const hasReview = artifacts.some((artifact) => artifact.type === "ReviewResult");
 
   const codexEvents = useMemo(
     () => (agentBus?.run?.events ?? []).filter((event) => event.type === "codex-event" || event.type === "codex-request"),
@@ -198,16 +171,29 @@ export default function App() {
 
     return [...messageItems, ...eventItems];
   }, [agentBus?.messages, agentBus?.run?.id, codexEvents]);
-  const canGoNext = currentStepIndex < workflowSteps.length - 1;
-  const visibleStatus = currentStep ? statusLabel(currentStep.statusAfterRun) : "待小五发令";
-  const nextActionLabel =
-    currentStepIndex < 0
-      ? "开始：小五创建 PRD"
-      : currentStepIndex === 0
-        ? "发送 TaskSpec 给 CC"
-        : canGoNext
-          ? "执行下一步"
-          : "流程已完成";
+  const nextActionLabel = !hasPrd
+    ? "小五创建 PRD"
+    : !hasTaskSpec
+      ? "发送 TaskSpec 给 CC"
+      : hasReport && !hasReview
+        ? "小五验收报告"
+        : agentBus?.run?.status === "running"
+          ? "等待 CC 报告"
+          : "等待真实下一步";
+  const canRunAction = !actionBusy && (!hasPrd || !hasTaskSpec || (hasReport && !hasReview));
+
+  function getStepStatus(step: WorkflowStep): WorkflowStatus {
+    if (step.id === 1) return hasPrd ? "done" : "waiting";
+    if (step.id === 2) return hasTaskSpec ? "done" : hasPrd ? "active" : "waiting";
+    if (step.id === 3) {
+      if (hasReport) return "done";
+      if (agentBus?.run) return "active";
+      return hasTaskSpec ? "active" : "waiting";
+    }
+    if (step.id === 4) return hasReview ? "done" : hasReport ? "active" : "waiting";
+    if (step.id === 5) return hasReview ? "failed" : "waiting";
+    return "waiting";
+  }
 
   async function refreshAgentBus() {
     try {
@@ -236,24 +222,32 @@ export default function App() {
   }
 
   async function advanceWorkflow() {
-    if (currentStepIndex === 0) {
-      setCurrentStepIndex(1);
+    const endpoint = !hasPrd
+      ? "/api/xiaowu/prd"
+      : !hasTaskSpec
+        ? "/api/agentbus/tasks/smallcalc"
+        : hasReport && !hasReview
+          ? "/api/xiaowu/review"
+          : null;
 
-      try {
-        const response = await fetch("/api/agentbus/tasks/smallcalc", { method: "POST" });
+    if (!endpoint) return;
 
-        if (!response.ok) {
-          throw new Error(`send task failed: ${response.status}`);
-        }
-
-        await refreshAgentBus();
-      } catch (error) {
-        setApiError(error instanceof Error ? error.message : "无法发送 TaskSpec");
+    setActionBusy(true);
+    try {
+      const response = await fetch(endpoint, { method: "POST" });
+      if (!response.ok) {
+        const detail = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(detail?.error ?? `${endpoint} failed: ${response.status}`);
       }
-      return;
+      await refreshAgentBus();
+      if (endpoint === "/api/xiaowu/prd") setCurrentStepIndex(0);
+      if (endpoint === "/api/agentbus/tasks/smallcalc") setCurrentStepIndex(1);
+      if (endpoint === "/api/xiaowu/review") setCurrentStepIndex(3);
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "执行失败");
+    } finally {
+      setActionBusy(false);
     }
-
-    setCurrentStepIndex((step) => Math.min(step + 1, workflowSteps.length - 1));
   }
 
   useEffect(() => {
@@ -270,15 +264,25 @@ export default function App() {
       return;
     }
 
-    if (agentBus.messages.some((message) => message.type === "ImplementationReport")) {
+    if (hasReview) {
+      setCurrentStepIndex(4);
+      return;
+    }
+
+    if (hasReport) {
       setCurrentStepIndex(2);
       return;
     }
 
-    if (agentBus.messages.some((message) => message.type === "TaskSpec")) {
+    if (hasTaskSpec) {
       setCurrentStepIndex(1);
+      return;
     }
-  }, [agentBus, currentStepIndex]);
+
+    if (hasPrd) {
+      setCurrentStepIndex(0);
+    }
+  }, [agentBus, currentStepIndex, hasPrd, hasReport, hasReview, hasTaskSpec]);
 
   return (
     <main className="app-shell" aria-labelledby="app-title">
@@ -303,11 +307,11 @@ export default function App() {
           </button>
           <button
             className="primary"
-            disabled={!canGoNext}
+            disabled={!canRunAction}
             onClick={() => void advanceWorkflow()}
             type="button"
           >
-            {nextActionLabel}
+            {actionBusy ? "小五处理中..." : nextActionLabel}
           </button>
         </div>
       </header>
@@ -321,7 +325,7 @@ export default function App() {
 
           <ol className="timeline">
             {workflowSteps.map((step, index) => {
-              const status = getStepStatus(index, currentStepIndex);
+              const status = getStepStatus(step);
               const isCurrent = index === currentStepIndex;
 
               return (
@@ -349,26 +353,30 @@ export default function App() {
               <p className="eyebrow">Artifact Viewer</p>
               <h2 id="detail-title">产出物</h2>
             </div>
-            <span className={`state-pill ${currentStep?.statusAfterRun ?? "waiting"}`}>
-              {visibleStatus}
+            <span className={`state-pill ${latestArtifact ? "done" : "waiting"}`}>
+              {latestArtifact?.status ?? "等待真实产出"}
             </span>
           </div>
 
           <article className="artifact-document" aria-label="当前步骤产出物">
             <div className="artifact-document-header">
               <div>
-                <p className="eyebrow">{currentStep ? `Step ${currentStep.id} · ${currentStep.actor}` : "Ready"}</p>
-                <h3>{currentStep?.artifactTitle ?? "尚未生成产出物"}</h3>
+                <p className="eyebrow">{latestArtifact ? `Step ${latestArtifact.stepId} · ${latestArtifact.actor}` : "Ready"}</p>
+                <h3>{latestArtifact?.title ?? "尚未生成产出物"}</h3>
               </div>
-              <span>{currentStep?.title ?? "等待小五发令"}</span>
+              <span>{latestArtifact?.type ?? "等待小五发令"}</span>
             </div>
 
             <div className="artifact-body">
-              <p>{currentStep?.artifactBody ?? "当前还没有 PRD、TaskSpec 或报告。点击“开始：小五创建 PRD”后，小五才会生成第一份产出物。"}</p>
+              <p>{latestArtifact?.body ?? "当前还没有 PRD、TaskSpec 或报告。点击“小五创建 PRD”后，小五会通过真实 LLM 生成第一份产出物。"}</p>
             </div>
 
             <div className="artifact-output-list">
-              {(currentStep?.evidence ?? ["SmallCalc 尚未开始实现", "等待小五生成 PRD"]).map((item) => (
+              {[
+                agentBus?.llm?.configured ? `LLM: ${agentBus.llm.provider} / ${agentBus.llm.model}` : "LLM 未配置",
+                latestArtifact ? latestArtifact.type : "等待真实产出",
+                latestArtifact ? latestArtifact.createdAt : "无预置结果",
+              ].map((item) => (
                 <span key={item}>{item}</span>
               ))}
             </div>

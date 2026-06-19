@@ -3,8 +3,72 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
-function createAgentBusState(hasTask = false) {
+type TestStage = "empty" | "prd" | "task" | "report" | "review";
+
+function createAgentBusState(stage: TestStage = "empty") {
+  const hasPrd = ["prd", "task", "report", "review"].includes(stage);
+  const hasTask = ["task", "report", "review"].includes(stage);
+  const hasReport = ["report", "review"].includes(stage);
+  const hasReview = stage === "review";
+
   return {
+    artifacts: [
+      ...(hasPrd
+        ? [
+            {
+              id: "prd-smallcalc-v1",
+              stepId: 1,
+              actor: "小五",
+              type: "PRD",
+              title: "SmallCalc PRD v1",
+              status: "created",
+              summary: "真实 LLM PRD",
+              body: "SmallCalc PRD body",
+              createdAt: "2026-06-19T00:00:00.000Z",
+            },
+          ]
+        : []),
+      ...(hasTask
+        ? [
+            {
+              id: "taskspec-smallcalc-v1",
+              stepId: 2,
+              actor: "小五",
+              type: "TaskSpec",
+              title: "SmallCalc TaskSpec v1",
+              status: "created",
+              summary: "真实 LLM TaskSpec",
+              body: "SmallCalc TaskSpec body",
+              createdAt: "2026-06-19T00:00:01.000Z",
+            },
+          ]
+        : []),
+      ...(hasReview
+        ? [
+            {
+              id: "review-smallcalc-v1",
+              stepId: 4,
+              actor: "小五",
+              type: "ReviewResult",
+              title: "小五验收报告 v1",
+              status: "created",
+              summary: "真实 LLM Review",
+              body: "验收不通过：CC 本轮只提交报告，尚未实现 SmallCalc。",
+              createdAt: "2026-06-19T00:00:02.000Z",
+            },
+          ]
+        : []),
+    ],
+    tasks: hasTask ? [{ id: "task-smallcalc-mvp-001", type: "TaskSpec", status: "queued" }] : [],
+    reports: hasReport
+      ? [{ id: "report-smallcalc-mvp-001", type: "ImplementationReport", status: "submitted", payload: { summary: "CC submitted real report." } }]
+      : [],
+    llm: {
+      provider: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      model: "gpt-5.4-mini",
+      configured: true,
+    },
     messages: hasTask
       ? [
           {
@@ -55,27 +119,37 @@ function createAgentBusState(hasTask = false) {
 }
 
 describe("小五工作台", () => {
-  let hasTask = false;
+  let stage: TestStage = "empty";
 
   beforeEach(() => {
-    hasTask = false;
+    stage = "empty";
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL, init?: { method?: string }) => {
         const url = String(input);
 
+        if (url === "/api/xiaowu/prd" && init?.method === "POST") {
+          stage = "prd";
+          return Response.json({ ok: true });
+        }
+
         if (url === "/api/agentbus/tasks/smallcalc" && init?.method === "POST") {
-          hasTask = true;
+          stage = "task";
+          return Response.json({ ok: true });
+        }
+
+        if (url === "/api/xiaowu/review" && init?.method === "POST") {
+          stage = "review";
           return Response.json({ ok: true });
         }
 
         if (url === "/api/agentbus/reset" && init?.method === "POST") {
-          hasTask = false;
+          stage = "empty";
           return Response.json({ ok: true });
         }
 
         if (url === "/api/agentbus/state") {
-          return Response.json(createAgentBusState(hasTask));
+          return Response.json(createAgentBusState(stage));
         }
 
         return Response.json({ error: "not found" }, { status: 404 });
@@ -83,7 +157,7 @@ describe("小五工作台", () => {
     );
   });
 
-  it("默认等待小五发令，不展示已开始实现的状态", () => {
+  it("默认等待小五发令，不展示任何预置结果", () => {
     render(<App />);
 
     expect(
@@ -91,24 +165,26 @@ describe("小五工作台", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "产出物" })).toBeInTheDocument();
     expect(screen.getByText("尚未生成产出物")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "小五创建 PRD" })).toBeEnabled();
     expect(screen.queryByLabelText("当前流程状态")).not.toBeInTheDocument();
   });
 
-  it("小五发出指令后展示创建 PRD 的第一步", async () => {
+  it("小五创建 PRD 后才展示 PRD 产出物", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
+    await user.click(screen.getByRole("button", { name: "小五创建 PRD" }));
 
-    expect(screen.getByRole("heading", { name: "PRD v0.1" })).toBeInTheDocument();
-    expect(screen.getByText(/SmallCalc 是一个基础计算器 MVP/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "SmallCalc PRD v1" })).toBeInTheDocument();
+    expect(screen.getByText("SmallCalc PRD body")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发送 TaskSpec 给 CC" })).toBeEnabled();
   });
 
-  it("第二步明确展示小五发送给 CC 的 TaskSpec 通信包", async () => {
+  it("TaskSpec 必须在 PRD 之后真实发送给 CC", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
+    await user.click(screen.getByRole("button", { name: "小五创建 PRD" }));
     expect(screen.getByText("尚未通信")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "发送 TaskSpec 给 CC" }));
@@ -118,7 +194,7 @@ describe("小五工作台", () => {
     expect(within(conversation).getByText(/目标：SmallCalc/)).toBeInTheDocument();
     expect(within(conversation).getByText(/目标仓库：\/tmp\/smallcalc-app/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "产出物" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "TaskSpec" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "SmallCalc TaskSpec v1" })).toBeInTheDocument();
     expect(screen.getByText("Codex App Server")).toBeInTheDocument();
     expect(screen.getByText("thread-test")).toBeInTheDocument();
     expect(
@@ -128,48 +204,22 @@ describe("小五工作台", () => {
     ).toBeInTheDocument();
   });
 
-  it("可以按 7 个步骤逐步推进到最终通过", async () => {
+  it("没有真实报告时不会允许小五验收", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
-    for (let index = 0; index < 6; index += 1) {
-      await user.click(
-        screen.getByRole("button", { name: index === 0 ? "发送 TaskSpec 给 CC" : "执行下一步" }),
-      );
-    }
+    await user.click(screen.getByRole("button", { name: "小五创建 PRD" }));
+    await user.click(screen.getByRole("button", { name: "发送 TaskSpec 给 CC" }));
 
-    expect(screen.getByRole("heading", { name: "XiaoWu PM Review: Approved" })).toBeInTheDocument();
-    expect(screen.getByText("SmallCalc MVP is approved。模拟 PR 进入 xiaowu:approved 状态。")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "流程已完成" })).toBeDisabled();
-  });
-
-  it("第 5 步明确展示不通过项，第 7 步展示通过项", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
-    for (let index = 0; index < 4; index += 1) {
-      await user.click(
-        screen.getByRole("button", { name: index === 0 ? "发送 TaskSpec 给 CC" : "执行下一步" }),
-      );
-    }
-
-    expect(screen.getByRole("heading", { name: "XiaoWu PM Review" })).toBeInTheDocument();
-    expect(screen.getAllByText(/AC-6 Keyboard input/).length).toBeGreaterThan(0);
-
-    await user.click(screen.getByRole("button", { name: "执行下一步" }));
-    await user.click(screen.getByRole("button", { name: "执行下一步" }));
-
-    expect(screen.queryByLabelText("当前流程状态")).not.toBeInTheDocument();
-    expect(screen.getByText("SmallCalc MVP is approved。模拟 PR 进入 xiaowu:approved 状态。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "等待 CC 报告" })).toBeDisabled();
+    expect(screen.queryByText(/Approved/)).not.toBeInTheDocument();
   });
 
   it("可以从任意步骤重置回第一步", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
+    await user.click(screen.getByRole("button", { name: "小五创建 PRD" }));
     await user.click(screen.getByRole("button", { name: "重置" }));
 
     expect(screen.getByText("尚未生成产出物")).toBeInTheDocument();

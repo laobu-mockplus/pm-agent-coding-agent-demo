@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test("小五工作台可以逐步演示不通过到通过", async ({ page }) => {
+test("小五工作台不会预置结果，必须先真实创建 PRD 再发送 TaskSpec", async ({ page }) => {
+  test.setTimeout(120_000);
   await page.request.post("/api/agentbus/reset");
   await page.goto("/");
 
@@ -9,33 +10,46 @@ test("小五工作台可以逐步演示不通过到通过", async ({ page }) => 
   await expect(page.getByText("尚未生成产出物")).toBeVisible();
   await expect(page.getByLabel("当前流程状态")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "开始：小五创建 PRD" }).click();
-  await expect(page.getByRole("heading", { name: "PRD v0.1" })).toBeVisible();
+  await page.getByRole("button", { name: "小五创建 PRD" }).click();
+  const prdOutcome = await page
+    .waitForFunction(
+      () => {
+        const body = document.body.textContent ?? "";
+        const hasPrd = Array.from(document.querySelectorAll("h3")).some((heading) =>
+          heading.textContent?.includes("SmallCalc PRD v1"),
+        );
+        const hasProviderError = body.includes("All configured LLM providers failed");
+
+        if (hasPrd) return "prd";
+        if (hasProviderError) return "provider-error";
+        return false;
+      },
+      undefined,
+      { timeout: 90_000 },
+    )
+    .then((handle) => handle.jsonValue());
+
+  if (prdOutcome === "provider-error") {
+    await expect(page.getByText("All configured LLM providers failed")).toBeVisible();
+    await expect(page.getByText("尚未生成产出物")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "SmallCalc PRD v1" })).toHaveCount(0);
+    return;
+  }
+
+  await expect(page.getByRole("heading", { name: "SmallCalc PRD v1" })).toBeVisible();
   await expect(page.getByText("尚未通信")).toBeVisible();
 
   await page.getByRole("button", { name: "发送 TaskSpec 给 CC" }).click();
   const conversation = page.getByLabel("小五和 CC 会话消息");
-  await expect(conversation.getByText("TaskSpec", { exact: true })).toBeVisible();
+  await expect(conversation.getByText("TaskSpec", { exact: true })).toBeVisible({ timeout: 90_000 });
   await expect(conversation.getByText("目标：SmallCalc")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "TaskSpec" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "SmallCalc TaskSpec v1" })).toBeVisible();
   await expect(page.getByLabel("Codex App Server 状态").getByText("Codex App Server")).toBeVisible();
   await expect(conversation.getByText("thread/started")).toBeVisible();
   await expect(
     conversation.getByText("CC test worker received TaskSpec through Codex App Server."),
   ).toBeVisible();
-
-  for (let index = 0; index < 3; index += 1) {
-    await page.getByRole("button", { name: "执行下一步" }).click();
-  }
-
-  await expect(page.getByRole("heading", { name: "XiaoWu PM Review" })).toBeVisible();
-  await expect(page.getByText(/AC-6 Keyboard input/)).toBeVisible();
-
-  await page.getByRole("button", { name: "执行下一步" }).click();
-  await page.getByRole("button", { name: "执行下一步" }).click();
-
-  await expect(page.getByRole("heading", { name: "XiaoWu PM Review: Approved" })).toBeVisible();
-  await expect(page.getByText("SmallCalc MVP is approved。模拟 PR 进入 xiaowu:approved 状态。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "等待 CC 报告" })).toBeDisabled();
 });
 
 test("小五工作台使用固定窗口和内部滚动", async ({ page }) => {
