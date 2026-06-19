@@ -1,6 +1,6 @@
 :root {
-  color: #1b2024;
-  background: #f3f5f2;
+  color: #171a2e;
+  background: #f5f6ff;
   font-family:
     "IBM Plex Sans", "Aptos", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   font-synthesis: none;
@@ -36,21 +36,30 @@ button {
   min-height: 0;
   overflow: hidden;
   background:
-    linear-gradient(90deg, rgba(34, 126, 96, 0.08) 0 1px, transparent 1px 100%),
-    linear-gradient(0deg, rgba(34, 126, 96, 0.06) 0 1px, transparent 1px 100%),
-    #f4f6f1;
+    linear-gradient(90deg, rgba(49, 87, 255, 0.13) 0 1px, transparent 1px 100%),
+    linear-gradient(0deg, rgba(255, 90, 61, 0.08) 0 1px, transparent 1px 100%),
+    #f5f6ff;
   background-size: 28px 28px;
 }
 
 .topbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   min-height: 64px;
   padding: 10px 18px;
-  border-bottom: 1px solid #d7ded4;
-  background: rgba(250, 251, 247, 0.94);
+  border-bottom: 1px solid #d8ddec;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.topbar::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #3157ff 0%, #ff5a3d 48%, #ffb000 100%);
+  content: "";
 }
 
 .brand-block,
@@ -72,17 +81,19 @@ button {
   width: 42px;
   height: 42px;
   place-items: center;
-  border: 1px solid #1b2024;
+  border: 1px solid #171a2e;
   border-radius: 6px;
-  background: #1b2024;
-  color: #fbfbf6;
+  background:
+    linear-gradient(135deg, #171a2e 0 48%, #3157ff 49% 73%, #ff5a3d 74% 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(49, 87, 255, 0.28);
   font-size: 0.86rem;
   font-weight: 800;
 }
 
 .eyebrow {
   margin: 0 0 4px;
-  color: #697169;
+  color: #6b7280;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -97,21 +108,21 @@ p {
 }
 
 h1 {
-  color: #1b2024;
+  color: #171a2e;
   font-size: 1.04rem;
   font-weight: 850;
   line-height: 1.25;
 }
 
 h2 {
-  color: #1b2024;
+  color: #171a2e;
   font-size: 1rem;
   font-weight: 850;
   line-height: 1.25;
 }
 
 h3 {
-  color: #1b2024;
+  color: #171a2e;
   font-size: 0.92rem;
   line-height: 1.25;
 }
@@ -122,7 +133,7 @@ h3 {
 
 .run-controls button {
   min-height: 34px;
-  border: 1px solid #aeb8aa;
+  border: 1px solid #b7bfd6;
   border-radius: 6px;
   padding: 0 12px;
   cursor: pointer;
@@ -136,13 +147,15 @@ h3 {
 }
 
 .primary {
-  background: #1d7a5d;
+  border-color: #171a2e;
+  background: linear-gradient(135deg, #3157ff 0%, #2340c9 62%, #ff5a3d 100%);
   color: #ffffff;
+  box-shadow: 0 8px 18px rgba(49, 87, 255, 0.2);
 }
 
 .secondary {
   background: #ffffff;
-  color: #2e3934;
+  color: #242842;
 }
 
 .icon-button {
@@ -150,10 +163,10 @@ h3 {
   width: 34px;
   height: 34px;
   place-items: center;
-  border: 1px solid #d4dcd0;
+  border: 1px solid #d7dcec;
   border-radius: 6px;
   background: #ffffff;
-  color: #202723;
+  color: #1d2138;
   cursor: pointer;
   font-size: 1.2rem;
   font-weight: 900;
@@ -173,10 +186,10 @@ h3 {
 .detail-panel,
 .comm-panel {
   min-height: 0;
-  border: 1px solid #d7ded4;
+  border: 1px solid #d8ddec;
   border-radius: 8px;
-  background: rgba(255, 255, 251, 0.96);
-  box-shadow: 0 12px 28px rgba(27, 32, 36, 0.07);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 28px rgba(23, 26, 46, 0.10);
 }
 
 .timeline-panel,
@@ -189,7 +202,7 @@ h3 {
   justify-content: space-between;
   min-height: 48px;
   padding: 10px 14px;
-  border-bottom: 1px solid #e1e6de;
+  border-bottom: 1px solid #e2e6f3;
 }
 
 .timeline {
@@ -209,41 +222,42 @@ h3 {
   min-height: 58px;
   align-items: center;
   gap: 10px;
-  border: 1px solid #dbe1d8;
+  border: 1px solid #dfe3f3;
   border-radius: 7px;
   padding: 9px 10px;
   background: #ffffff;
-  color: #202723;
+  color: #1d2138;
   cursor: pointer;
   text-align: left;
 }
 
 .timeline-item.current button {
-  border-color: #1d7a5d;
-  background: #eff8f2;
+  border-color: #ff5a3d;
+  background: linear-gradient(90deg, rgba(255, 90, 61, 0.12), #ffffff 42%);
+  box-shadow: inset 4px 0 0 #ff5a3d;
 }
 
 .status-dot {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #b9c2b4;
+  background: #b7bdd2;
 }
 
 .status-dot.done {
-  background: #1d7a5d;
+  background: #3157ff;
 }
 
 .status-dot.active {
-  background: #b97712;
+  background: #ffb000;
 }
 
 .status-dot.failed {
-  background: #bd3d32;
+  background: #ff5a3d;
 }
 
 .status-dot.approved {
-  background: #116c48;
+  background: #0589a6;
 }
 
 .step-copy {
@@ -262,7 +276,7 @@ h3 {
 }
 
 .step-meta {
-  color: #6b756b;
+  color: #697089;
   font-size: 0.76rem;
 }
 
@@ -277,20 +291,20 @@ h3 {
 }
 
 .artifact-viewer {
-  background: rgba(255, 255, 251, 0.98);
+  background: rgba(255, 255, 255, 0.98);
 }
 
 .artifact-viewer-head {
   min-height: 48px;
   padding: 0 0 10px;
-  border-bottom: 1px solid #e1e6de;
+  border-bottom: 1px solid #e2e6f3;
 }
 
 .artifact-document {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
-  border: 1px solid #dfe5dc;
+  border: 1px solid #e0e4f2;
   border-radius: 8px;
   background: #ffffff;
   overflow: hidden;
@@ -302,18 +316,20 @@ h3 {
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid #e4e9e1;
-  background: #fbfcf8;
+  border-bottom: 1px solid #e6e9f5;
+  background:
+    linear-gradient(90deg, rgba(49, 87, 255, 0.08), transparent 55%),
+    #fbfcff;
 }
 
 .artifact-document-header span {
   max-width: 42%;
   overflow: hidden;
-  border: 1px solid #dbe2d8;
+  border: 1px solid #dfe4f5;
   border-radius: 999px;
   padding: 5px 9px;
   background: #ffffff;
-  color: #4b564f;
+  color: #4c5575;
   font-size: 0.74rem;
   font-weight: 850;
   text-overflow: ellipsis;
@@ -328,7 +344,7 @@ h3 {
 
 .artifact-body p {
   max-width: 780px;
-  color: #26312b;
+  color: #242842;
   font-size: 1rem;
   line-height: 1.72;
   white-space: pre-wrap;
@@ -339,16 +355,16 @@ h3 {
   flex-wrap: wrap;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid #e4e9e1;
-  background: #fbfcf8;
+  border-top: 1px solid #e6e9f5;
+  background: #fbfcff;
 }
 
 .artifact-output-list span {
-  border: 1px solid #dbe2d8;
+  border: 1px solid #dfe4f5;
   border-radius: 6px;
   padding: 7px 9px;
   background: #ffffff;
-  color: #2f3933;
+  color: #2c314f;
   font-size: 0.78rem;
   font-weight: 760;
 }
@@ -360,36 +376,36 @@ h3 {
 
 .state-pill {
   flex: 0 0 auto;
-  border: 1px solid #ccd5c8;
+  border: 1px solid #cfd6ea;
   border-radius: 999px;
   padding: 5px 9px;
   background: #ffffff;
-  color: #2d3932;
+  color: #2c314f;
   font-size: 0.76rem;
   font-weight: 850;
 }
 
 .state-pill.failed {
-  border-color: #d88e85;
-  background: #fff0ee;
-  color: #9b281f;
+  border-color: #ff9a8a;
+  background: #fff0ed;
+  color: #c53624;
 }
 
 .state-pill.approved {
-  border-color: #9ccab3;
-  background: #edf9f2;
-  color: #116c48;
+  border-color: #8fd7e6;
+  background: #eafaff;
+  color: #0589a6;
 }
 
 .state-pill.active {
-  border-color: #d9b46b;
-  background: #fff7e8;
-  color: #8b570b;
+  border-color: #ffd166;
+  background: #fff7df;
+  color: #9a6200;
 }
 
 .summary {
   max-width: 780px;
-  color: #445049;
+  color: #4e5878;
   font-size: 0.94rem;
   line-height: 1.55;
 }
@@ -398,9 +414,9 @@ h3 {
 .result-block {
   display: grid;
   gap: 9px;
-  border: 1px solid #dfe5dc;
+  border: 1px solid #e0e4f2;
   border-radius: 8px;
-  background: #fbfcf8;
+  background: #fbfcff;
 }
 
 .artifact-block {
@@ -408,7 +424,7 @@ h3 {
 }
 
 .artifact-block p {
-  color: #3d4842;
+  color: #39405f;
   font-size: 0.9rem;
   line-height: 1.55;
 }
@@ -421,29 +437,29 @@ h3 {
 
 .evidence-grid span {
   min-height: 34px;
-  border: 1px solid #dbe2d8;
+  border: 1px solid #dfe4f5;
   border-radius: 6px;
   padding: 8px 9px;
   background: #ffffff;
-  color: #2f3933;
+  color: #2c314f;
   font-size: 0.82rem;
   font-weight: 720;
 }
 
 .result-block {
   padding: 13px 14px;
-  border-left: 4px solid #1d7a5d;
+  border-left: 4px solid #3157ff;
 }
 
 .result-block span {
-  color: #6b746b;
+  color: #6d748c;
   font-size: 0.72rem;
   font-weight: 850;
   text-transform: uppercase;
 }
 
 .result-block strong {
-  color: #202723;
+  color: #1d2138;
   font-size: 0.98rem;
 }
 
@@ -457,7 +473,7 @@ h3 {
 }
 
 .chat-panel {
-  background: rgba(255, 255, 251, 0.98);
+  background: rgba(255, 255, 255, 0.98);
 }
 
 .chat-list {
@@ -473,16 +489,18 @@ h3 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px 8px;
-  border: 1px solid #dbe2d8;
+  border: 1px solid #dfe4f5;
   border-radius: 7px;
   padding: 9px 10px;
-  background: #f5f8f3;
+  background:
+    linear-gradient(90deg, rgba(5, 137, 166, 0.1), transparent 58%),
+    #f4f6ff;
 }
 
 .runtime-strip span,
 .runtime-strip em {
   overflow: hidden;
-  color: #657069;
+  color: #6a718d;
   font-size: 0.72rem;
   font-style: normal;
   text-overflow: ellipsis;
@@ -492,7 +510,7 @@ h3 {
 .runtime-strip strong {
   border-radius: 999px;
   padding: 3px 8px;
-  background: #1b2024;
+  background: #171a2e;
   color: #ffffff;
   font-size: 0.7rem;
 }
@@ -516,20 +534,22 @@ h3 {
 .chat-message.xiaowu .chat-avatar {
   grid-column: 2;
   grid-row: 1;
-  background: #1b2024;
+  background: #171a2e;
   color: #ffffff;
 }
 
 .chat-message.xiaowu .chat-bubble {
   grid-column: 1;
   grid-row: 1;
-  border-color: #c7d9ce;
-  background: #eef8f2;
+  border-color: #c8d2ff;
+  background:
+    linear-gradient(90deg, rgba(49, 87, 255, 0.1), transparent 70%),
+    #ffffff;
 }
 
 .chat-message.system .chat-avatar {
-  background: #eef1ea;
-  color: #526057;
+  background: #f0f2f8;
+  color: #5b647e;
   font-size: 0.64rem;
 }
 
@@ -539,7 +559,7 @@ h3 {
   height: 34px;
   place-items: center;
   border-radius: 6px;
-  background: #1d7a5d;
+  background: #3157ff;
   color: #ffffff;
   font-size: 0.7rem;
   font-weight: 900;
@@ -547,7 +567,7 @@ h3 {
 
 .chat-bubble {
   min-width: 0;
-  border: 1px solid #dfe5dc;
+  border: 1px solid #e0e4f2;
   border-radius: 8px;
   padding: 9px 10px;
   background: #ffffff;
@@ -563,7 +583,7 @@ h3 {
 
 .chat-meta strong {
   overflow: hidden;
-  color: #202723;
+  color: #1d2138;
   font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -572,7 +592,7 @@ h3 {
 .chat-meta span {
   overflow: hidden;
   max-width: 52%;
-  color: #6b756b;
+  color: #697089;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 0.66rem;
   text-overflow: ellipsis;
@@ -580,7 +600,7 @@ h3 {
 }
 
 .chat-bubble p {
-  color: #303a34;
+  color: #303650;
   font-size: 0.8rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -590,38 +610,38 @@ h3 {
 .chat-empty {
   display: grid;
   gap: 7px;
-  border: 1px solid #dfe5dc;
+  border: 1px solid #e0e4f2;
   border-radius: 7px;
   padding: 10px;
   background: #ffffff;
 }
 
 .chat-empty strong {
-  color: #232b27;
+  color: #242842;
   font-size: 0.82rem;
 }
 
 .chat-empty p {
-  color: #69736a;
+  color: #697089;
   font-size: 0.78rem;
   line-height: 1.38;
 }
 
 .chat-empty.warning {
-  border-color: #d9b46b;
+  border-color: #ffd166;
   background: #fff8ea;
 }
 
 .chat-empty.pending {
-  border-color: #9ccab3;
-  background: #eff8f2;
+  border-color: #8fd7e6;
+  background: #eef2ff;
 }
 
 .comm-row,
 .comm-empty {
   display: grid;
   gap: 9px;
-  border: 1px solid #dfe5dc;
+  border: 1px solid #e0e4f2;
   border-radius: 7px;
   padding: 10px;
   background: #ffffff;
@@ -635,7 +655,7 @@ h3 {
 }
 
 .message-meta span {
-  color: #1d7a5d;
+  color: #3157ff;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 0.72rem;
   font-weight: 900;
@@ -643,7 +663,7 @@ h3 {
 
 .message-meta strong,
 .comm-empty strong {
-  color: #232b27;
+  color: #242842;
   font-size: 0.82rem;
   line-height: 1.35;
 }
@@ -652,7 +672,7 @@ h3 {
   border-radius: 999px;
   padding: 3px 7px;
   background: #edf8f1;
-  color: #116c48;
+  color: #0589a6;
   font-size: 0.7rem;
   font-style: normal;
   font-weight: 850;
@@ -665,14 +685,14 @@ h3 {
   gap: 8px;
   border-radius: 6px;
   padding: 8px;
-  background: #f5f7f2;
-  color: #1f2923;
+  background: #f5f6ff;
+  color: #202642;
   font-size: 0.82rem;
   font-weight: 850;
 }
 
 .route-line b {
-  color: #1d7a5d;
+  color: #3157ff;
 }
 
 .route-line span:last-child {
@@ -681,13 +701,13 @@ h3 {
 
 .channel,
 .comm-empty p {
-  color: #69736a;
+  color: #697089;
   font-size: 0.78rem;
   line-height: 1.38;
 }
 
 .comm-empty.warning {
-  border-color: #d9b46b;
+  border-color: #ffd166;
   background: #fff8ea;
 }
 
@@ -696,7 +716,7 @@ h3 {
   gap: 5px;
   margin: 0;
   padding-left: 18px;
-  color: #303a34;
+  color: #303650;
   font-size: 0.78rem;
   line-height: 1.38;
 }
@@ -704,10 +724,10 @@ h3 {
 .cc-run-panel {
   display: grid;
   gap: 9px;
-  border: 1px solid #cfd8cb;
+  border: 1px solid #d8ddec;
   border-radius: 7px;
   padding: 10px;
-  background: #f8faf5;
+  background: #f8faff;
 }
 
 .run-header {
@@ -720,7 +740,7 @@ h3 {
 .run-header span {
   border-radius: 999px;
   padding: 4px 8px;
-  background: #1b2024;
+  background: #171a2e;
   color: #ffffff;
   font-size: 0.7rem;
   font-weight: 850;
@@ -736,7 +756,7 @@ h3 {
 .codex-console {
   display: grid;
   gap: 9px;
-  border: 1px solid #dae2d7;
+  border: 1px solid #dde3f2;
   border-radius: 7px;
   padding: 9px;
   background: #ffffff;
@@ -750,11 +770,11 @@ h3 {
 }
 
 .codex-console-head span {
-  border: 1px solid #c9d7cf;
+  border: 1px solid #cdd8ef;
   border-radius: 999px;
   padding: 3px 7px;
-  background: #eff8f2;
-  color: #116c48;
+  background: #eef2ff;
+  color: #0589a6;
   font-size: 0.7rem;
   font-weight: 850;
 }
@@ -768,14 +788,14 @@ h3 {
 
 .codex-metrics div {
   min-width: 0;
-  border: 1px solid #edf1ea;
+  border: 1px solid #eef1fb;
   border-radius: 6px;
   padding: 7px;
-  background: #f8faf5;
+  background: #f8faff;
 }
 
 .codex-metrics dt {
-  color: #6b756b;
+  color: #697089;
   font-size: 0.68rem;
   font-weight: 850;
   text-transform: uppercase;
@@ -784,7 +804,7 @@ h3 {
 .codex-metrics dd {
   overflow: hidden;
   margin: 3px 0 0;
-  color: #202723;
+  color: #1d2138;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 0.72rem;
   font-weight: 850;
@@ -805,15 +825,15 @@ h3 {
   gap: 7px;
   border-radius: 6px;
   padding: 6px 7px;
-  background: #f4f7f1;
-  color: #303a34;
+  background: #f3f5ff;
+  color: #303650;
   font-size: 0.72rem;
   line-height: 1.35;
 }
 
 .codex-event span {
   overflow: hidden;
-  color: #1d7a5d;
+  color: #3157ff;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-weight: 900;
   text-overflow: ellipsis;
@@ -831,20 +851,20 @@ h3 {
   border-radius: 6px;
   padding: 7px 8px;
   background: #ffffff;
-  color: #303a34;
+  color: #303650;
   font-size: 0.76rem;
   line-height: 1.35;
 }
 
 .run-event span {
-  color: #1d7a5d;
+  color: #3157ff;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-weight: 900;
 }
 
 .run-event.stderr span,
 .run-event.error span {
-  color: #bd3d32;
+  color: #ff5a3d;
 }
 
 .run-event p {
@@ -859,7 +879,7 @@ h3 {
   display: grid;
   place-items: center;
   padding: 22px;
-  background: rgba(27, 32, 36, 0.34);
+  background: rgba(23, 26, 46, 0.42);
 }
 
 .settings-panel {
@@ -869,10 +889,10 @@ h3 {
   max-height: min(760px, calc(100dvh - 44px));
   min-height: 0;
   overflow: hidden;
-  border: 1px solid #cfd8cb;
+  border: 1px solid #d8ddec;
   border-radius: 8px;
-  background: #fffffb;
-  box-shadow: 0 22px 70px rgba(27, 32, 36, 0.22);
+  background: #ffffff;
+  box-shadow: 0 22px 70px rgba(23, 26, 46, 0.24);
 }
 
 .settings-head {
@@ -882,8 +902,8 @@ h3 {
   gap: 16px;
   min-height: 66px;
   padding: 14px 16px;
-  border-bottom: 1px solid #dfe6dc;
-  background: #fbfcf8;
+  border-bottom: 1px solid #e2e6f3;
+  background: #fbfcff;
 }
 
 .settings-body {
@@ -895,26 +915,28 @@ h3 {
 .settings-nav {
   min-height: 0;
   padding: 12px;
-  border-right: 1px solid #dfe6dc;
-  background: #f5f8f3;
+  border-right: 1px solid #e2e6f3;
+  background: #f4f6ff;
 }
 
 .settings-nav button {
   display: grid;
   width: 100%;
   gap: 4px;
-  border: 1px solid #dbe2d8;
+  border: 1px solid #dfe4f5;
   border-radius: 7px;
   padding: 11px 12px;
   background: #ffffff;
-  color: #1f2923;
+  color: #202642;
   cursor: pointer;
   text-align: left;
 }
 
 .settings-nav button.active {
-  border-color: #1d7a5d;
-  background: #eff8f2;
+  border-color: #ff5a3d;
+  background:
+    linear-gradient(90deg, rgba(255, 90, 61, 0.12), transparent 65%),
+    #ffffff;
 }
 
 .settings-nav strong {
@@ -923,7 +945,7 @@ h3 {
 }
 
 .settings-nav span {
-  color: #6b756b;
+  color: #697089;
   font-size: 0.74rem;
 }
 
@@ -939,7 +961,7 @@ h3 {
 .settings-section {
   display: grid;
   gap: 12px;
-  border: 1px solid #dfe5dc;
+  border: 1px solid #e0e4f2;
   border-radius: 8px;
   padding: 14px;
   background: #ffffff;
@@ -951,12 +973,12 @@ h3 {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #e6ebe3;
+  border-bottom: 1px solid #e8ebf6;
 }
 
 .settings-section-head p {
   margin-top: 5px;
-  color: #667166;
+  color: #697089;
   font-size: 0.78rem;
   line-height: 1.45;
 }
@@ -977,10 +999,10 @@ h3 {
 .field select,
 .field textarea {
   width: 100%;
-  border: 1px solid #cfd8cb;
+  border: 1px solid #d8ddec;
   border-radius: 6px;
-  background: #fbfcf8;
-  color: #1f2923;
+  background: #fbfcff;
+  color: #202642;
   font: inherit;
   font-size: 0.82rem;
 }
@@ -1003,23 +1025,23 @@ h3 {
   grid-template-columns: 18px minmax(0, 1fr);
   align-items: start;
   gap: 9px;
-  border: 1px solid #dfe5dc;
+  border: 1px solid #e0e4f2;
   border-radius: 7px;
   padding: 10px;
-  background: #fbfcf8;
+  background: #fbfcff;
 }
 
 .toggle-row input {
   width: 16px;
   height: 16px;
   margin: 1px 0 0;
-  accent-color: #1d7a5d;
+  accent-color: #3157ff;
 }
 
 .toggle-row em {
   display: block;
   margin-top: 4px;
-  color: #6b756b;
+  color: #697089;
   font-size: 0.74rem;
   font-style: normal;
   font-weight: 500;
@@ -1027,11 +1049,11 @@ h3 {
 }
 
 .settings-error {
-  border: 1px solid #d9b46b;
+  border: 1px solid #ffd166;
   border-radius: 7px;
   padding: 10px;
   background: #fff8ea;
-  color: #6e4709;
+  color: #895b00;
   font-size: 0.8rem;
   line-height: 1.42;
 }
@@ -1044,13 +1066,13 @@ h3 {
   gap: 8px;
   margin: 0 -14px -14px;
   padding: 12px 14px;
-  border-top: 1px solid #e1e6de;
-  background: rgba(255, 255, 251, 0.96);
+  border-top: 1px solid #e2e6f3;
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .settings-actions button {
   min-height: 36px;
-  border: 1px solid #aeb8aa;
+  border: 1px solid #b7bfd6;
   border-radius: 6px;
   padding: 0 13px;
   cursor: pointer;
@@ -1115,6 +1137,6 @@ h3 {
 
   .settings-nav {
     border-right: 0;
-    border-bottom: 1px solid #dfe6dc;
+    border-bottom: 1px solid #e2e6f3;
   }
 }
