@@ -184,7 +184,7 @@ h3 {
 
 .timeline-panel,
 .detail-panel,
-.log-panel {
+.comm-panel {
   min-height: 0;
   border: 1px solid #d7ded4;
   border-radius: 8px;
@@ -193,7 +193,7 @@ h3 {
 }
 
 .timeline-panel,
-.log-panel {
+.comm-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
 }
@@ -382,7 +382,7 @@ h3 {
   font-size: 0.98rem;
 }
 
-.log-list {
+.comm-list {
   display: grid;
   align-content: start;
   gap: 8px;
@@ -391,32 +391,81 @@ h3 {
   overflow-y: auto;
 }
 
-.log-row {
+.comm-row,
+.comm-empty {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 8px;
+  gap: 9px;
   border: 1px solid #dfe5dc;
   border-radius: 7px;
-  padding: 9px;
+  padding: 10px;
   background: #ffffff;
 }
 
-.log-row > span {
+.message-meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-meta span {
   color: #1d7a5d;
-  font-size: 0.78rem;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
   font-weight: 900;
 }
 
-.log-row strong {
-  display: block;
+.message-meta strong,
+.comm-empty strong {
   color: #232b27;
   font-size: 0.82rem;
   line-height: 1.35;
 }
 
-.log-row p {
-  margin-top: 3px;
+.message-meta em {
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: #edf8f1;
+  color: #116c48;
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.route-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
+  padding: 8px;
+  background: #f5f7f2;
+  color: #1f2923;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.route-line b {
+  color: #1d7a5d;
+}
+
+.route-line span:last-child {
+  text-align: right;
+}
+
+.channel,
+.comm-empty p {
   color: #69736a;
+  font-size: 0.78rem;
+  line-height: 1.38;
+}
+
+.comm-row ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: #303a34;
   font-size: 0.78rem;
   line-height: 1.38;
 }
@@ -424,10 +473,11 @@ h3 {
 @media (max-width: 1060px) {
   .workspace {
     grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(170px, 0.34fr);
   }
 
-  .log-panel {
-    display: none;
+  .comm-panel {
+    grid-column: 1 / -1;
   }
 }
 
@@ -451,7 +501,7 @@ h3 {
 
   .workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(190px, 0.42fr) minmax(0, 1fr);
+    grid-template-rows: minmax(170px, 0.32fr) minmax(0, 1fr) minmax(160px, 0.3fr);
   }
 
   .timeline-panel {
@@ -459,6 +509,11 @@ h3 {
   }
 
   .detail-panel {
+    min-height: 0;
+  }
+
+  .comm-panel {
+    grid-column: auto;
     min-height: 0;
   }
 

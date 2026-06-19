@@ -19,19 +19,38 @@ describe("小五工作台", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "小五发出指令" }));
+    await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
 
     expect(screen.getByRole("heading", { name: "小五创建 SmallCalc PRD" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("小五已生成 PRD，尚未产生 SmallCalc 程序代码。");
+  });
+
+  it("第二步明确展示小五发送给 CC 的 TaskSpec 通信包", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
+    expect(screen.getByText("尚未通信")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "发送 TaskSpec 给 CC" }));
+
+    const communication = screen.getByLabelText("小五和 CC 通信消息");
+    expect(within(communication).getByText("MSG-001")).toBeInTheDocument();
+    expect(within(communication).getByText("TaskSpec")).toBeInTheDocument();
+    expect(within(communication).getByText("小五")).toBeInTheDocument();
+    expect(within(communication).getByText("CC")).toBeInTheDocument();
+    expect(within(communication).getByText("目标：实现 SmallCalc MVP")).toBeInTheDocument();
   });
 
   it("可以按 7 个步骤逐步推进到最终通过", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "小五发出指令" }));
+    await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
     for (let index = 0; index < 6; index += 1) {
-      await user.click(screen.getByRole("button", { name: "执行下一步" }));
+      await user.click(
+        screen.getByRole("button", { name: index === 0 ? "发送 TaskSpec 给 CC" : "执行下一步" }),
+      );
     }
 
     expect(screen.getByRole("heading", { name: "小五再次验收并通过" })).toBeInTheDocument();
@@ -43,13 +62,15 @@ describe("小五工作台", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "小五发出指令" }));
+    await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
     for (let index = 0; index < 4; index += 1) {
-      await user.click(screen.getByRole("button", { name: "执行下一步" }));
+      await user.click(
+        screen.getByRole("button", { name: index === 0 ? "发送 TaskSpec 给 CC" : "执行下一步" }),
+      );
     }
 
     expect(screen.getByRole("heading", { name: "小五判定不通过并列出不合格项" })).toBeInTheDocument();
-    expect(screen.getByText(/AC-6 Keyboard input/)).toBeInTheDocument();
+    expect(screen.getAllByText(/AC-6 Keyboard input/).length).toBeGreaterThan(0);
     expect(screen.getByRole("status")).toHaveTextContent("验收不通过，CC 进入修复。");
 
     await user.click(screen.getByRole("button", { name: "执行下一步" }));
@@ -64,7 +85,7 @@ describe("小五工作台", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "小五发出指令" }));
+    await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
     await user.click(screen.getByRole("button", { name: "重置" }));
 
     expect(screen.getByRole("heading", { name: "等待小五发出第一条指令" })).toBeInTheDocument();

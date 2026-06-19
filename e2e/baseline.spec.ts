@@ -7,10 +7,17 @@ test("小五工作台可以逐步演示不通过到通过", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "等待小五发出第一条指令" })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("SmallCalc 尚未开始实现。");
 
-  await page.getByRole("button", { name: "小五发出指令" }).click();
+  await page.getByRole("button", { name: "开始：小五创建 PRD" }).click();
   await expect(page.getByRole("heading", { name: "小五创建 SmallCalc PRD" })).toBeVisible();
+  await expect(page.getByText("尚未通信")).toBeVisible();
 
-  for (let index = 0; index < 4; index += 1) {
+  await page.getByRole("button", { name: "发送 TaskSpec 给 CC" }).click();
+  const communication = page.getByLabel("小五和 CC 通信消息");
+  await expect(communication.getByText("MSG-001")).toBeVisible();
+  await expect(communication.getByText("TaskSpec")).toBeVisible();
+  await expect(communication.getByText("目标：实现 SmallCalc MVP")).toBeVisible();
+
+  for (let index = 0; index < 3; index += 1) {
     await page.getByRole("button", { name: "执行下一步" }).click();
   }
 
@@ -34,12 +41,12 @@ test("小五工作台使用固定窗口和内部滚动", async ({ page }) => {
     bodyScrollHeight: document.body.scrollHeight,
     shellHeight: document.querySelector(".app-shell")?.getBoundingClientRect().height ?? 0,
     timelineOverflow: getComputedStyle(document.querySelector(".timeline") as Element).overflowY,
-    logOverflow: getComputedStyle(document.querySelector(".log-list") as Element).overflowY,
+    commOverflow: getComputedStyle(document.querySelector(".comm-list") as Element).overflowY,
   }));
 
   expect(layout.shellHeight).toBe(layout.viewportHeight);
   expect(layout.htmlScrollHeight).toBeLessThanOrEqual(layout.viewportHeight + 2);
   expect(layout.bodyScrollHeight).toBeLessThanOrEqual(layout.viewportHeight + 2);
   expect(layout.timelineOverflow).toBe("auto");
-  expect(layout.logOverflow).toBe("auto");
+  expect(layout.commOverflow).toBe("auto");
 });

@@ -16,6 +16,17 @@ type WorkflowStep = {
   result: string;
 };
 
+type CommunicationMessage = {
+  id: string;
+  stepId: number;
+  from: "小五" | "CC";
+  to: "小五" | "CC";
+  type: string;
+  channel: string;
+  status: string;
+  payload: string[];
+};
+
 const workflowSteps: WorkflowStep[] = [
   {
     id: 1,
@@ -96,6 +107,63 @@ const workflowSteps: WorkflowStep[] = [
   },
 ];
 
+const communicationMessages: CommunicationMessage[] = [
+  {
+    id: "MSG-001",
+    stepId: 2,
+    from: "小五",
+    to: "CC",
+    type: "TaskSpec",
+    channel: "GitHub Issue + .agentbus",
+    status: "已发送",
+    payload: [
+      "目标：实现 SmallCalc MVP",
+      "验收：AC-1 到 AC-8",
+      "报告：PR body 必须包含 CC ImplementationReport",
+    ],
+  },
+  {
+    id: "MSG-002",
+    stepId: 3,
+    from: "CC",
+    to: "小五",
+    type: "ImplementationReport",
+    channel: "Pull Request body",
+    status: "已回传",
+    payload: ["实现：基础计算器", "验证：测试和构建通过", "缺口：AC-6 键盘输入未完成"],
+  },
+  {
+    id: "MSG-003",
+    stepId: 5,
+    from: "小五",
+    to: "CC",
+    type: "ReviewRequest",
+    channel: "PR review comment",
+    status: "已驳回",
+    payload: ["判定：不通过", "失败项：AC-6 Keyboard input", "要求：补测试并复用同一套计算器逻辑"],
+  },
+  {
+    id: "MSG-004",
+    stepId: 6,
+    from: "CC",
+    to: "小五",
+    type: "FixReport",
+    channel: "Pull Request update",
+    status: "已回传",
+    payload: ["修复：键盘输入", "验证：AC-6 已覆盖", "报告：全部 AC 标记为通过"],
+  },
+  {
+    id: "MSG-005",
+    stepId: 7,
+    from: "小五",
+    to: "CC",
+    type: "Approval",
+    channel: "PR approval comment",
+    status: "已通过",
+    payload: ["判定：通过", "结果：SmallCalc MVP approved", "标签：xiaowu:approved"],
+  },
+];
+
 function getStepStatus(stepIndex: number, currentStepIndex: number): WorkflowStatus {
   if (stepIndex > currentStepIndex) {
     return "waiting";
@@ -122,9 +190,20 @@ export default function App() {
   const completedCount = Math.max(currentStepIndex + 1, 0);
   const progress = Math.round((completedCount / workflowSteps.length) * 100);
 
-  const eventLog = useMemo(() => [...workflowSteps.slice(0, completedCount)].reverse(), [completedCount]);
+  const visibleMessages = useMemo(
+    () => communicationMessages.filter((message) => message.stepId <= completedCount).reverse(),
+    [completedCount],
+  );
   const canGoNext = currentStepIndex < workflowSteps.length - 1;
   const visibleStatus = currentStep ? statusLabel(currentStep.statusAfterRun) : "待小五发令";
+  const nextActionLabel =
+    currentStepIndex < 0
+      ? "开始：小五创建 PRD"
+      : currentStepIndex === 0
+        ? "发送 TaskSpec 给 CC"
+        : canGoNext
+          ? "执行下一步"
+          : "流程已完成";
 
   return (
     <main className="app-shell" aria-labelledby="app-title">
@@ -153,7 +232,7 @@ export default function App() {
             onClick={() => setCurrentStepIndex((step) => Math.min(step + 1, workflowSteps.length - 1))}
             type="button"
           >
-            {currentStepIndex < 0 ? "小五发出指令" : canGoNext ? "执行下一步" : "流程已完成"}
+            {nextActionLabel}
           </button>
         </div>
       </header>
@@ -243,30 +322,38 @@ export default function App() {
           </div>
         </section>
 
-        <aside className="log-panel" aria-labelledby="log-title">
+        <aside className="comm-panel" aria-labelledby="comm-title">
           <div className="panel-heading">
-            <p className="eyebrow">State</p>
-            <h2 id="log-title">状态日志</h2>
+            <p className="eyebrow">Protocol</p>
+            <h2 id="comm-title">通信通道</h2>
           </div>
 
-          <div className="log-list">
-            {eventLog.length > 0 ? (
-              eventLog.map((step) => (
-                <article className="log-row" key={step.id}>
-                  <span>{`#${step.id}`}</span>
-                  <div>
-                    <strong>{step.title}</strong>
-                    <p>{step.result}</p>
+          <div className="comm-list" aria-label="小五和 CC 通信消息">
+            {visibleMessages.length > 0 ? (
+              visibleMessages.map((message) => (
+                <article className="comm-row" key={message.id}>
+                  <div className="message-meta">
+                    <span>{message.id}</span>
+                    <strong>{message.type}</strong>
+                    <em>{message.status}</em>
                   </div>
+                  <div className="route-line">
+                    <span>{message.from}</span>
+                    <b aria-hidden="true">-&gt;</b>
+                    <span>{message.to}</span>
+                  </div>
+                  <p className="channel">{message.channel}</p>
+                  <ul>
+                    {message.payload.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
                 </article>
               ))
             ) : (
-              <article className="log-row">
-                <span>#0</span>
-                <div>
-                  <strong>等待小五指令</strong>
-                  <p>当前没有 SmallCalc 实现任务。</p>
-                </div>
+              <article className="comm-empty">
+                <strong>尚未通信</strong>
+                <p>当前没有 TaskSpec 发给 CC；SmallCalc 不会提前开始实现。</p>
               </article>
             )}
           </div>
