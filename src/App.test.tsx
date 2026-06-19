@@ -11,6 +11,12 @@ async function pressSequence(labels: string[]) {
   }
 }
 
+async function typeKeys(sequence: string) {
+  const user = userEvent.setup();
+
+  await user.keyboard(sequence);
+}
+
 describe("SmallCalc", () => {
   it.each([
     [["7", "add", "5", "equals"], "12"],
@@ -70,5 +76,37 @@ describe("SmallCalc", () => {
     const history = screen.getByRole("list", { name: "Calculation history" });
     expect(within(history).getByText("7 + 5")).toBeInTheDocument();
     expect(within(history).getByText("12")).toBeInTheDocument();
+  });
+
+  it("accepts keyboard number keys, decimal point, plus, and Enter", async () => {
+    render(<App />);
+
+    await typeKeys("1.5+2.25{Enter}");
+
+    expect(screen.getByRole("status", { name: "Calculator display" })).toHaveTextContent("3.75");
+  });
+
+  it.each([
+    ["9-4{Enter}", "5"],
+    ["6*3{Enter}", "18"],
+    ["8/2{Enter}", "4"],
+  ])("accepts keyboard operator sequence %s", async (sequence, expected) => {
+    render(<App />);
+
+    await typeKeys(sequence);
+
+    expect(screen.getByRole("status", { name: "Calculator display" })).toHaveTextContent(
+      expected,
+    );
+  });
+
+  it("accepts keyboard Backspace and Escape", async () => {
+    render(<App />);
+
+    await typeKeys("89{Backspace}");
+    expect(screen.getByRole("status", { name: "Calculator display" })).toHaveTextContent("8");
+
+    await typeKeys("{Escape}");
+    expect(screen.getByRole("status", { name: "Calculator display" })).toHaveTextContent("0");
   });
 });

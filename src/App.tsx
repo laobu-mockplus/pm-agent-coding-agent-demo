@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   type CalculatorButton,
+  calculatorButtonForKey,
   initialCalculatorState,
   pressCalculatorButton,
 } from "./calculator";
@@ -35,9 +36,26 @@ const keypad: KeypadButton[] = [
 export default function App() {
   const [calculator, setCalculator] = useState(initialCalculatorState);
 
-  function handlePress(button: CalculatorButton) {
+  const handlePress = useCallback((button: CalculatorButton) => {
     setCalculator((current) => pressCalculatorButton(current, button));
-  }
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const button = calculatorButtonForKey(event.key);
+
+      if (!button) {
+        return;
+      }
+
+      event.preventDefault();
+      handlePress(button);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handlePress]);
 
   return (
     <main className="shell">

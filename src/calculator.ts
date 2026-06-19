@@ -78,6 +78,26 @@ export function pressCalculatorButton(
   };
 }
 
+export function calculatorButtonForKey(key: string): CalculatorButton | null {
+  if (/^[0-9]$/.test(key)) {
+    return key as CalculatorButton;
+  }
+
+  const keyMap: Record<string, CalculatorButton> = {
+    ".": "decimal point",
+    "+": "add",
+    "-": "subtract",
+    "*": "multiply",
+    "/": "divide",
+    Enter: "equals",
+    "=": "equals",
+    Backspace: "backspace",
+    Escape: "clear",
+  };
+
+  return keyMap[key] ?? null;
+}
+
 function inputDigit(state: CalculatorState, digit: string): CalculatorState {
   const nextState = clearErrorForInput(state);
 
