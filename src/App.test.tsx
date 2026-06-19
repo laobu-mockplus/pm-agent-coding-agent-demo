@@ -89,9 +89,9 @@ describe("小五工作台", () => {
     expect(
       screen.getByRole("heading", { name: "小五工作台：SmallCalc MVP 验收演示" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "等待小五发出第一条指令" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("SmallCalc 尚未开始实现。");
-    expect(screen.getByText("0%")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "产出物" })).toBeInTheDocument();
+    expect(screen.getByText("尚未生成产出物")).toBeInTheDocument();
+    expect(screen.queryByLabelText("当前流程状态")).not.toBeInTheDocument();
   });
 
   it("小五发出指令后展示创建 PRD 的第一步", async () => {
@@ -100,8 +100,8 @@ describe("小五工作台", () => {
 
     await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
 
-    expect(screen.getByRole("heading", { name: "小五创建 SmallCalc PRD" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("小五已生成 PRD，尚未产生 SmallCalc 程序代码。");
+    expect(screen.getByRole("heading", { name: "PRD v0.1" })).toBeInTheDocument();
+    expect(screen.getByText(/SmallCalc 是一个基础计算器 MVP/)).toBeInTheDocument();
   });
 
   it("第二步明确展示小五发送给 CC 的 TaskSpec 通信包", async () => {
@@ -113,18 +113,16 @@ describe("小五工作台", () => {
 
     await user.click(screen.getByRole("button", { name: "发送 TaskSpec 给 CC" }));
 
-    const communication = screen.getByLabelText("小五和 CC 通信消息");
-    expect(within(communication).getByText("MSG-001")).toBeInTheDocument();
-    expect(within(communication).getByText("TaskSpec")).toBeInTheDocument();
-    expect(within(communication).getByText("小五")).toBeInTheDocument();
-    expect(within(communication).getByText("CC")).toBeInTheDocument();
-    expect(within(communication).getByText("目标：SmallCalc")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "CC 执行台" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Codex App Server" })).toBeInTheDocument();
-    expect(screen.getByText("json-rpc/stdio")).toBeInTheDocument();
+    const conversation = screen.getByLabelText("小五和 CC 会话消息");
+    expect(within(conversation).getByText("TaskSpec")).toBeInTheDocument();
+    expect(within(conversation).getByText(/目标：SmallCalc/)).toBeInTheDocument();
+    expect(within(conversation).getByText(/目标仓库：\/tmp\/smallcalc-app/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "产出物" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "TaskSpec" })).toBeInTheDocument();
+    expect(screen.getByText("Codex App Server")).toBeInTheDocument();
     expect(screen.getByText("thread-test")).toBeInTheDocument();
     expect(
-      within(screen.getByLabelText("Codex App Server 结构化事件")).getByText(
+      within(conversation).getByText(
         /CC test worker received TaskSpec through Codex App Server/,
       ),
     ).toBeInTheDocument();
@@ -141,8 +139,8 @@ describe("小五工作台", () => {
       );
     }
 
-    expect(screen.getByRole("heading", { name: "小五再次验收并通过" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("流程完成，小五 PM Agent demo 通过。");
+    expect(screen.getByRole("heading", { name: "XiaoWu PM Review: Approved" })).toBeInTheDocument();
+    expect(screen.getByText("SmallCalc MVP is approved。模拟 PR 进入 xiaowu:approved 状态。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "流程已完成" })).toBeDisabled();
   });
 
@@ -157,15 +155,13 @@ describe("小五工作台", () => {
       );
     }
 
-    expect(screen.getByRole("heading", { name: "小五判定不通过并列出不合格项" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "XiaoWu PM Review" })).toBeInTheDocument();
     expect(screen.getAllByText(/AC-6 Keyboard input/).length).toBeGreaterThan(0);
-    expect(screen.getByRole("status")).toHaveTextContent("验收不通过，CC 进入修复。");
 
     await user.click(screen.getByRole("button", { name: "执行下一步" }));
     await user.click(screen.getByRole("button", { name: "执行下一步" }));
 
-    const statusStrip = screen.getByLabelText("当前流程状态");
-    expect(within(statusStrip).getByText("100%")).toBeInTheDocument();
+    expect(screen.queryByLabelText("当前流程状态")).not.toBeInTheDocument();
     expect(screen.getByText("SmallCalc MVP is approved。模拟 PR 进入 xiaowu:approved 状态。")).toBeInTheDocument();
   });
 
@@ -176,7 +172,7 @@ describe("小五工作台", () => {
     await user.click(screen.getByRole("button", { name: "开始：小五创建 PRD" }));
     await user.click(screen.getByRole("button", { name: "重置" }));
 
-    expect(screen.getByRole("heading", { name: "等待小五发出第一条指令" })).toBeInTheDocument();
-    expect(screen.getByText("0%")).toBeInTheDocument();
+    expect(screen.getByText("尚未生成产出物")).toBeInTheDocument();
+    expect(screen.queryByLabelText("当前流程状态")).not.toBeInTheDocument();
   });
 });

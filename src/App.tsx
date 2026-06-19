@@ -59,6 +59,15 @@ type AgentBusState = {
   } | null;
 };
 
+type ChatItem = {
+  id: string;
+  speaker: "小五" | "CC" | "Codex";
+  tone: "xiaowu" | "cc" | "system";
+  title: string;
+  body: string;
+  meta: string;
+};
+
 const workflowSteps: WorkflowStep[] = [
   {
     id: 1,
@@ -164,14 +173,31 @@ export default function App() {
   const [agentBus, setAgentBus] = useState<AgentBusState | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const currentStep = currentStepIndex >= 0 ? workflowSteps[currentStepIndex] : null;
-  const completedCount = Math.max(currentStepIndex + 1, 0);
-  const progress = Math.round((completedCount / workflowSteps.length) * 100);
 
-  const visibleMessages = useMemo(() => [...(agentBus?.messages ?? [])].reverse(), [agentBus?.messages]);
   const codexEvents = useMemo(
     () => (agentBus?.run?.events ?? []).filter((event) => event.type === "codex-event" || event.type === "codex-request"),
     [agentBus?.run?.events],
   );
+  const chatItems = useMemo<ChatItem[]>(() => {
+    const messageItems = (agentBus?.messages ?? []).map((message) => ({
+      id: message.id,
+      speaker: message.from,
+      tone: message.from === "小五" ? ("xiaowu" as const) : ("cc" as const),
+      title: message.type,
+      body: message.payload.join("\n"),
+      meta: `${message.status} · ${message.channel}`,
+    }));
+    const eventItems = codexEvents.slice(-18).map((event, index) => ({
+      id: `${event.at}-${index}`,
+      speaker: "Codex" as const,
+      tone: "system" as const,
+      title: event.method ?? event.type,
+      body: event.itemType ? `${event.itemType} · ${event.text ?? event.status ?? ""}` : event.text ?? event.status ?? "运行中",
+      meta: event.turnId ?? event.threadId ?? agentBus?.run?.id ?? "runtime",
+    }));
+
+    return [...messageItems, ...eventItems];
+  }, [agentBus?.messages, agentBus?.run?.id, codexEvents]);
   const canGoNext = currentStepIndex < workflowSteps.length - 1;
   const visibleStatus = currentStep ? statusLabel(currentStep.statusAfterRun) : "待小五发令";
   const nextActionLabel =
@@ -286,25 +312,6 @@ export default function App() {
         </div>
       </header>
 
-      <section className="status-strip" aria-label="当前流程状态">
-        <div>
-          <span>当前步骤</span>
-          <strong>{`${completedCount} / ${workflowSteps.length}`}</strong>
-        </div>
-        <div>
-          <span>当前角色</span>
-          <strong>{currentStep?.actor ?? "小五"}</strong>
-        </div>
-        <div>
-          <span>流程进度</span>
-          <strong>{progress}%</strong>
-        </div>
-        <div>
-          <span>验收状态</span>
-          <strong>{visibleStatus}</strong>
-        </div>
-      </section>
-
       <section className="workspace">
         <aside className="timeline-panel" aria-labelledby="timeline-title">
           <div className="panel-heading">
@@ -336,161 +343,81 @@ export default function App() {
           </ol>
         </aside>
 
-        <section className="detail-panel" aria-labelledby="detail-title">
-          <div className="detail-header">
+        <section className="detail-panel artifact-viewer" aria-labelledby="detail-title">
+          <div className="detail-header artifact-viewer-head">
             <div>
-              <p className="eyebrow">{currentStep ? `Step ${currentStep.id}` : "Ready"}</p>
-              <h2 id="detail-title">{currentStep?.title ?? "等待小五发出第一条指令"}</h2>
+              <p className="eyebrow">Artifact Viewer</p>
+              <h2 id="detail-title">产出物</h2>
             </div>
             <span className={`state-pill ${currentStep?.statusAfterRun ?? "waiting"}`}>
               {visibleStatus}
             </span>
           </div>
 
-          <p className="summary">
-            {currentStep?.summary ?? "当前没有 SmallCalc 程序实现，也没有 CC 执行分支。点击“小五发出指令”后，才开始模拟 PRD、TaskSpec、CC 实现和小五验收流程。"}
-          </p>
-
-          <div className="artifact-block">
-            <div>
-              <p className="eyebrow">Artifact</p>
-              <h3>{currentStep?.artifactTitle ?? "未生成"}</h3>
+          <article className="artifact-document" aria-label="当前步骤产出物">
+            <div className="artifact-document-header">
+              <div>
+                <p className="eyebrow">{currentStep ? `Step ${currentStep.id} · ${currentStep.actor}` : "Ready"}</p>
+                <h3>{currentStep?.artifactTitle ?? "尚未生成产出物"}</h3>
+              </div>
+              <span>{currentStep?.title ?? "等待小五发令"}</span>
             </div>
-            <p>{currentStep?.artifactBody ?? "SmallCalc 处于未启动状态；小五尚未向 CC 下发实现任务。"}</p>
-          </div>
 
-          <div className="evidence-grid">
-            {(currentStep?.evidence ?? ["无实现分支", "无打开的 SmallCalc PR", "等待小五发令"]).map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
+            <div className="artifact-body">
+              <p>{currentStep?.artifactBody ?? "当前还没有 PRD、TaskSpec 或报告。点击“开始：小五创建 PRD”后，小五才会生成第一份产出物。"}</p>
+            </div>
 
-          <div className="result-block" role="status" aria-live="polite">
-            <span>结果</span>
-            <strong>{currentStep?.result ?? "SmallCalc 尚未开始实现。"}</strong>
-          </div>
+            <div className="artifact-output-list">
+              {(currentStep?.evidence ?? ["SmallCalc 尚未开始实现", "等待小五生成 PRD"]).map((item) => (
+                <span key={item}>{item}</span>
+              ))}
+            </div>
+          </article>
         </section>
 
-        <aside className="comm-panel" aria-labelledby="comm-title">
+        <aside className="comm-panel chat-panel" aria-labelledby="comm-title">
           <div className="panel-heading">
-            <p className="eyebrow">Protocol</p>
-            <h2 id="comm-title">通信通道</h2>
+            <p className="eyebrow">Conversation</p>
+            <h2 id="comm-title">小五 / CC 会话</h2>
           </div>
 
-          <div className="comm-list" aria-label="小五和 CC 通信消息">
+          <div className="chat-list" aria-label="小五和 CC 会话消息">
             {apiError ? (
-              <article className="comm-empty warning">
+              <article className="chat-empty warning">
                 <strong>agentbus 暂不可读</strong>
                 <p>{apiError}</p>
               </article>
             ) : null}
 
-            {visibleMessages.length > 0 ? (
-              visibleMessages.map((message) => (
-                <article className="comm-row" key={message.id}>
-                  <div className="message-meta">
-                    <span>{message.id}</span>
-                    <strong>{message.type}</strong>
-                    <em>{message.status}</em>
+            {agentBus?.run ? (
+              <section className="runtime-strip" aria-label="Codex App Server 状态">
+                <span>{agentBus.run.runner?.adapter ?? "Codex App Server"}</span>
+                <strong>{agentBus.run.runner?.status ?? agentBus.run.status}</strong>
+                <em>{agentBus.run.runner?.threadId ?? "thread pending"}</em>
+              </section>
+            ) : null}
+
+            {chatItems.length > 0 ? (
+              chatItems.map((item) => (
+                <article className={`chat-message ${item.tone}`} key={item.id}>
+                  <div className="chat-avatar" aria-hidden="true">
+                    {item.speaker}
                   </div>
-                  <div className="route-line">
-                    <span>{message.from}</span>
-                    <b aria-hidden="true">-&gt;</b>
-                    <span>{message.to}</span>
+                  <div className="chat-bubble">
+                    <div className="chat-meta">
+                      <strong>{item.title}</strong>
+                      <span>{item.meta}</span>
+                    </div>
+                    <p>{item.body}</p>
                   </div>
-                  <p className="channel">{message.channel}</p>
-                  <ul>
-                    {message.payload.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
                 </article>
               ))
             ) : (
-              <article className="comm-empty">
+              <article className="chat-empty">
                 <strong>尚未通信</strong>
                 <p>当前没有 TaskSpec 发给 CC；SmallCalc 不会提前开始实现。</p>
               </article>
             )}
-
-            {agentBus?.run ? (
-              <section className="cc-run-panel" aria-labelledby="cc-run-title">
-                <div className="run-header">
-                  <div>
-                    <p className="eyebrow">CC Execution</p>
-                    <h3 id="cc-run-title">CC 执行台</h3>
-                  </div>
-                  <span>{agentBus.run.status}</span>
-                </div>
-                <p className="channel">{agentBus.run.id}</p>
-                <p className="channel">{agentBus.run.targetRepo}</p>
-                <section className="codex-console" aria-labelledby="codex-console-title">
-                  <div className="codex-console-head">
-                    <div>
-                      <p className="eyebrow">Codex</p>
-                      <h3 id="codex-console-title">Codex App Server</h3>
-                    </div>
-                    <span>{agentBus.run.runner?.mode ?? "unknown"}</span>
-                  </div>
-                  <dl className="codex-metrics">
-                    <div>
-                      <dt>Provider</dt>
-                      <dd>{agentBus.run.runner?.provider ?? "codex"}</dd>
-                    </div>
-                    <div>
-                      <dt>Adapter</dt>
-                      <dd>{agentBus.run.runner?.adapter ?? "Codex App Server"}</dd>
-                    </div>
-                    <div>
-                      <dt>Protocol</dt>
-                      <dd>{agentBus.run.runner?.protocol ?? "json-rpc/stdio"}</dd>
-                    </div>
-                    <div>
-                      <dt>Status</dt>
-                      <dd>{agentBus.run.runner?.status ?? agentBus.run.status}</dd>
-                    </div>
-                    <div>
-                      <dt>Thread</dt>
-                      <dd>{agentBus.run.runner?.threadId ?? "pending"}</dd>
-                    </div>
-                    <div>
-                      <dt>Turn</dt>
-                      <dd>{agentBus.run.runner?.turnId ?? "pending"}</dd>
-                    </div>
-                  </dl>
-                  <div className="codex-events" aria-label="Codex App Server 结构化事件">
-                    {codexEvents.length > 0 ? (
-                      codexEvents.slice(-10).map((event, index) => (
-                        <article className="codex-event" key={`${event.at}-${index}`}>
-                          <span>{event.method ?? event.type}</span>
-                          <p>{event.itemType ? `${event.itemType} · ${event.text ?? ""}` : event.text ?? event.status}</p>
-                        </article>
-                      ))
-                    ) : (
-                      <article className="codex-event">
-                        <span>waiting</span>
-                        <p>等待 Codex App Server 事件。</p>
-                      </article>
-                    )}
-                  </div>
-                </section>
-                <div className="run-events" aria-label="CC 执行过程消息">
-                  {agentBus.run.events.length > 0 ? (
-                    agentBus.run.events.map((event, index) => (
-                      <article className={`run-event ${event.type}`} key={`${event.at}-${index}`}>
-                        <span>{event.method ?? event.type}</span>
-                        <p>{event.itemType ? `${event.itemType} · ${event.text ?? ""}` : event.text ?? event.status ?? `exit code ${event.code}`}</p>
-                      </article>
-                    ))
-                  ) : (
-                    <article className="run-event">
-                      <span>queued</span>
-                      <p>等待 CC 输出。</p>
-                    </article>
-                  )}
-                </div>
-              </section>
-            ) : null}
           </div>
         </aside>
       </section>
