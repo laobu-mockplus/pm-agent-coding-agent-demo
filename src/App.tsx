@@ -42,6 +42,10 @@ type AgentBusState = {
     baseUrl: string;
     model: string;
     configured: boolean;
+    proxy?: {
+      enabled: boolean;
+      url?: string;
+    };
   };
   messages: CommunicationMessage[];
   run: {
@@ -373,7 +377,9 @@ export default function App() {
 
             <div className="artifact-output-list">
               {[
-                agentBus?.llm?.configured ? `LLM: ${agentBus.llm.provider} / ${agentBus.llm.model}` : "LLM 未配置",
+                agentBus?.llm?.configured
+                  ? `LLM: ${agentBus.llm.provider} / ${agentBus.llm.model} / 代理${agentBus.llm.proxy?.enabled ? "已启用" : "未启用"}`
+                  : "LLM 未配置",
                 latestArtifact ? latestArtifact.type : "等待真实产出",
                 latestArtifact ? latestArtifact.createdAt : "无预置结果",
               ].map((item) => (

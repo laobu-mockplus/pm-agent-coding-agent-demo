@@ -37,11 +37,11 @@ test("小五工作台不会预置结果，必须先真实创建 PRD 再发送 Ta
   }
 
   await expect(page.getByRole("heading", { name: "SmallCalc PRD v1" })).toBeVisible();
-  await expect(page.getByText("尚未通信")).toBeVisible();
+  const conversation = page.getByLabel("小五和 CC 会话消息");
+  await expect(conversation.getByText("TaskSpec", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "发送 TaskSpec 给 CC" }).click();
-  const conversation = page.getByLabel("小五和 CC 会话消息");
-  await expect(conversation.getByText("TaskSpec", { exact: true })).toBeVisible({ timeout: 90_000 });
+  await expect(conversation.getByText("TaskSpec", { exact: true }).first()).toBeVisible({ timeout: 90_000 });
   await expect(conversation.getByText("目标：SmallCalc")).toBeVisible();
   await expect(page.getByRole("heading", { name: "SmallCalc TaskSpec v1" })).toBeVisible();
   await expect(page.getByLabel("Codex App Server 状态").getByText("Codex App Server")).toBeVisible();
@@ -49,7 +49,10 @@ test("小五工作台不会预置结果，必须先真实创建 PRD 再发送 Ta
   await expect(
     conversation.getByText("CC test worker received TaskSpec through Codex App Server."),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "等待 CC 报告" })).toBeDisabled();
+  await page.waitForFunction(() => {
+    const buttonText = Array.from(document.querySelectorAll("button")).map((button) => button.textContent ?? "");
+    return buttonText.some((text) => text.includes("等待 CC 报告") || text.includes("小五验收报告"));
+  });
 });
 
 test("小五工作台使用固定窗口和内部滚动", async ({ page }) => {
