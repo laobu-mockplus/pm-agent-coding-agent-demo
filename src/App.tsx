@@ -292,7 +292,6 @@ export default function App() {
             小五
           </span>
           <div>
-            <p className="eyebrow">PM Agent Workbench</p>
             <h1 id="app-title">小五工作台：SmallCalc MVP 验收演示</h1>
           </div>
         </div>
@@ -319,7 +318,6 @@ export default function App() {
       <section className="workspace">
         <aside className="timeline-panel" aria-labelledby="timeline-title">
           <div className="panel-heading">
-            <p className="eyebrow">Replay</p>
             <h2 id="timeline-title">7 步流程</h2>
           </div>
 
@@ -350,7 +348,6 @@ export default function App() {
         <section className="detail-panel artifact-viewer" aria-labelledby="detail-title">
           <div className="detail-header artifact-viewer-head">
             <div>
-              <p className="eyebrow">Artifact Viewer</p>
               <h2 id="detail-title">产出物</h2>
             </div>
             <span className={`state-pill ${latestArtifact ? "done" : "waiting"}`}>
@@ -361,7 +358,7 @@ export default function App() {
           <article className="artifact-document" aria-label="当前步骤产出物">
             <div className="artifact-document-header">
               <div>
-                <p className="eyebrow">{latestArtifact ? `Step ${latestArtifact.stepId} · ${latestArtifact.actor}` : "Ready"}</p>
+                <p className="eyebrow">{latestArtifact ? `第 ${latestArtifact.stepId} 步 · ${latestArtifact.actor}` : "等待"}</p>
                 <h3>{latestArtifact?.title ?? "尚未生成产出物"}</h3>
               </div>
               <span>{latestArtifact?.type ?? "等待小五发令"}</span>
@@ -385,7 +382,6 @@ export default function App() {
 
         <aside className="comm-panel chat-panel" aria-labelledby="comm-title">
           <div className="panel-heading">
-            <p className="eyebrow">Conversation</p>
             <h2 id="comm-title">小五 / CC 会话</h2>
           </div>
 
