@@ -81,6 +81,15 @@ function createAgentBusState(stage: TestStage = "empty") {
       configured: true,
     },
     settings: testSettings,
+    orchestrator:
+      stage === "empty"
+        ? null
+        : {
+            status: stage === "review" ? "completed" : "running",
+            phase: stage === "review" ? "流程已完成" : "测试编排器正在推进",
+            startedAt: "2026-06-19T00:00:00.000Z",
+            updatedAt: "2026-06-19T00:00:01.000Z",
+          },
     messages: hasTask
       ? [
           {
@@ -142,12 +151,7 @@ describe("小五工作台", () => {
       vi.fn(async (input: string | URL, init?: { method?: string; body?: unknown }) => {
         const url = String(input);
 
-        if (url === "/api/xiaowu/prd" && init?.method === "POST") {
-          stage = "prd";
-          return Response.json({ ok: true });
-        }
-
-        if (url === "/api/agentbus/tasks/smallcalc" && init?.method === "POST") {
+        if (url === "/api/orchestrator/start" && init?.method === "POST") {
           stage = "task";
           return Response.json({ ok: true });
         }
@@ -184,29 +188,28 @@ describe("小五工作台", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "产出物" })).toBeInTheDocument();
     expect(screen.getByText("尚未生成产出物")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "小五创建 PRD" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "开始" })).toBeEnabled();
     expect(screen.queryByLabelText("当前流程状态")).not.toBeInTheDocument();
   });
 
-  it("小五创建 PRD 后才展示 PRD 产出物", async () => {
+  it("点击开始后由真实编排器推进到最新产出物", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "小五创建 PRD" }));
+    await user.click(screen.getByRole("button", { name: "开始" }));
 
-    expect(screen.getByRole("heading", { name: "SmallCalc PRD v1" })).toBeInTheDocument();
-    expect(screen.getByText("SmallCalc PRD body")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "发送 TaskSpec 给 CC" })).toBeEnabled();
+    expect(screen.getByRole("heading", { name: "SmallCalc TaskSpec v1" })).toBeInTheDocument();
+    expect(screen.getByText("SmallCalc TaskSpec body")).toBeInTheDocument();
+    expect(screen.getByText("编排器运行中")).toBeInTheDocument();
   });
 
-  it("TaskSpec 必须在 PRD 之后真实发送给 CC", async () => {
+  it("开始后 TaskSpec 由编排器真实发送给 CC", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "小五创建 PRD" }));
     expect(screen.getByText("尚未通信")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "发送 TaskSpec 给 CC" }));
+    await user.click(screen.getByRole("button", { name: "开始" }));
 
     const conversation = screen.getByLabelText("小五和 CC 会话消息");
     expect(within(conversation).getByText("TaskSpec")).toBeInTheDocument();
@@ -227,10 +230,9 @@ describe("小五工作台", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "小五创建 PRD" }));
-    await user.click(screen.getByRole("button", { name: "发送 TaskSpec 给 CC" }));
+    await user.click(screen.getByRole("button", { name: "开始" }));
 
-    expect(screen.getByRole("button", { name: "等待 CC 报告" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "开始" })).toBeDisabled();
     expect(screen.queryByText(/Approved/)).not.toBeInTheDocument();
   });
 
@@ -238,7 +240,7 @@ describe("小五工作台", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "小五创建 PRD" }));
+    await user.click(screen.getByRole("button", { name: "开始" }));
     await user.click(screen.getByRole("button", { name: "重置" }));
 
     expect(screen.getByText("尚未生成产出物")).toBeInTheDocument();

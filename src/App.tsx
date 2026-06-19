@@ -59,6 +59,13 @@ type AgentBusState = {
     };
   };
   settings: XiaowuSettings;
+  orchestrator: {
+    status: "idle" | "running" | "completed" | "failed" | "cancelled";
+    phase: string;
+    startedAt?: string;
+    updatedAt: string;
+    error?: string;
+  } | null;
   messages: CommunicationMessage[];
   run: {
     id: string;
@@ -283,9 +290,11 @@ export default function App() {
   const [actionBusy, setActionBusy] = useState(false);
   const settings = agentBus?.settings ?? defaultSettings;
   const artifacts = agentBus?.artifacts ?? [];
-  const latestArtifact = currentStepIndex >= 0
-    ? [...artifacts].reverse().find((artifact) => artifact.stepId === workflowSteps[currentStepIndex].id)
-    : artifacts.at(-1);
+  const selectedStepArtifact =
+    currentStepIndex >= 0
+      ? [...artifacts].reverse().find((artifact) => artifact.stepId === workflowSteps[currentStepIndex].id)
+      : undefined;
+  const latestArtifact = selectedStepArtifact ?? artifacts.at(-1);
   const hasPrd = artifacts.some((artifact) => artifact.type === "PRD");
   const hasTaskSpec = artifacts.some((artifact) => artifact.type === "TaskSpec");
   const reports = agentBus?.reports ?? [];
@@ -294,6 +303,8 @@ export default function App() {
   const hasFixTask = artifacts.some((artifact) => artifact.type === "FixTask");
   const hasImplementationReport = reports.some((report) => report.id === "report-smallcalc-implementation-001");
   const hasFinalReview = artifacts.some((artifact) => artifact.type === "FinalReviewResult");
+  const orchestrator = agentBus?.orchestrator;
+  const isOrchestratorRunning = orchestrator?.status === "running";
   const showTechnicalEvents = settings.ccPersona.showTechnicalEvents || settings.ccPersona.communicationStyle === "debug";
 
   const codexEvents = useMemo(
@@ -329,33 +340,17 @@ export default function App() {
 
     return [...messageItems, ...eventItems];
   }, [agentBus?.messages, codexEvents, settings.ccPersona.displayName, showTechnicalEvents]);
-  const nextActionLabel = (() => {
-    if (!hasPrd) return "小五创建 PRD";
-    if (!hasTaskSpec) return "发送 TaskSpec 给 CC";
-    if (!hasReport) return "等待 CC 报告";
-    if (!hasReview) return "小五验收报告";
-    if (!hasFixTask) return "要求 CC 实现 SmallCalc";
-    if (!hasImplementationReport) return "等待 CC 实现报告";
-    if (!hasFinalReview) return "小五再次验收";
-    return "流程已完成";
-  })();
-  const canRunAction =
-    !actionBusy &&
-    (!hasPrd ||
-      !hasTaskSpec ||
-      (hasReport && !hasReview) ||
-      (hasReview && !hasFixTask) ||
-      (hasImplementationReport && !hasFinalReview));
+  const canRunAction = !actionBusy && !isOrchestratorRunning;
 
   function getStepStatus(step: WorkflowStep): WorkflowStatus {
     if (step.id === 1) return hasPrd ? "done" : "waiting";
     if (step.id === 2) return hasTaskSpec ? "done" : hasPrd ? "active" : "waiting";
     if (step.id === 3) {
       if (hasReport) return "done";
-      if (agentBus?.run) return "active";
+      if (agentBus?.run || isOrchestratorRunning) return "active";
       return hasTaskSpec ? "active" : "waiting";
     }
-    if (step.id === 4) return hasReview ? "done" : hasReport ? "active" : "waiting";
+    if (step.id === 4) return hasReview ? "done" : hasReport || (isOrchestratorRunning && hasReport) ? "active" : "waiting";
     if (step.id === 5) return hasReview ? "failed" : "waiting";
     if (step.id === 6) {
       if (hasImplementationReport) return "done";
@@ -394,34 +389,16 @@ export default function App() {
   }
 
   async function advanceWorkflow() {
-    const endpoint = !hasPrd
-      ? "/api/xiaowu/prd"
-      : !hasTaskSpec
-        ? "/api/agentbus/tasks/smallcalc"
-        : hasReport && !hasReview
-          ? "/api/xiaowu/review"
-          : hasReview && !hasFixTask
-            ? "/api/xiaowu/fix-task"
-            : hasImplementationReport && !hasFinalReview
-              ? "/api/xiaowu/final-review"
-          : null;
-
-    if (!endpoint) return;
-
     setActionBusy(true);
     setActionError(null);
     try {
-      const response = await fetch(endpoint, { method: "POST" });
+      const response = await fetch("/api/orchestrator/start", { method: "POST" });
       if (!response.ok) {
         const detail = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(detail?.error ?? `${endpoint} failed: ${response.status}`);
+        throw new Error(detail?.error ?? `orchestrator failed: ${response.status}`);
       }
       await refreshAgentBus();
-      if (endpoint === "/api/xiaowu/prd") setCurrentStepIndex(0);
-      if (endpoint === "/api/agentbus/tasks/smallcalc") setCurrentStepIndex(1);
-      if (endpoint === "/api/xiaowu/review") setCurrentStepIndex(3);
-      if (endpoint === "/api/xiaowu/fix-task") setCurrentStepIndex(5);
-      if (endpoint === "/api/xiaowu/final-review") setCurrentStepIndex(6);
+      setCurrentStepIndex(-1);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "执行失败");
     } finally {
@@ -496,7 +473,11 @@ export default function App() {
   }, [agentBus?.settings, settingsOpen]);
 
   useEffect(() => {
-    if (currentStepIndex !== -1 || !agentBus) {
+    if (!agentBus) {
+      return;
+    }
+
+    if (currentStepIndex !== -1 && !isOrchestratorRunning) {
       return;
     }
 
@@ -539,6 +520,7 @@ export default function App() {
     hasFinalReview,
     hasFixTask,
     hasImplementationReport,
+    isOrchestratorRunning,
     hasPrd,
     hasReport,
     hasReview,
@@ -576,7 +558,7 @@ export default function App() {
             onClick={() => void advanceWorkflow()}
             type="button"
           >
-            {actionBusy ? "小五处理中..." : nextActionLabel}
+            开始
           </button>
         </div>
       </header>
@@ -631,7 +613,7 @@ export default function App() {
             </div>
 
             <div className="artifact-body">
-              <p>{latestArtifact?.body ?? "当前还没有 PRD、TaskSpec 或报告。点击“小五创建 PRD”后，小五会通过真实 LLM 生成第一份产出物。"}</p>
+              <p>{latestArtifact?.body ?? "当前还没有 PRD、TaskSpec 或报告。点击“开始”后，小五会通过真实 LLM 生成第一份产出物。"}</p>
             </div>
 
             <div className="artifact-output-list">
@@ -656,8 +638,22 @@ export default function App() {
           <div className="chat-list" aria-label="小五和 CC 会话消息">
             {actionBusy ? (
               <article className="chat-empty pending">
-                <strong>小五正在调用真实 LLM</strong>
-                <p>正在请求 `.env.local` 配置的 provider。完成前不会生成任何假产物。</p>
+                <strong>正在启动真实编排器</strong>
+                <p>启动后会按真实产物和 CC 报告连续推进；不会生成任何假结果。</p>
+              </article>
+            ) : null}
+
+            {isOrchestratorRunning ? (
+              <article className="chat-empty pending">
+                <strong>编排器运行中</strong>
+                <p>{orchestrator?.phase ?? "正在推进真实流程。"}</p>
+              </article>
+            ) : null}
+
+            {orchestrator?.status === "failed" ? (
+              <article className="chat-empty warning">
+                <strong>编排器失败</strong>
+                <p>{orchestrator.error ?? orchestrator.phase}</p>
               </article>
             ) : null}
 
