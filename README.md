@@ -1,46 +1,46 @@
-# PM Agent / Coding Agent Demo
+# 小五 PM Agent 工作台 Demo
 
-This repository is a real GitHub-loop MVP for a PM agent named **XiaoWu** and a coding agent named
-**CC**.
+这个仓库当前用于验证 **小五** 作为 PM Agent 管理 **CC** 作为 Coding Agent 的可视化流程。
 
-The demo product is **SmallCalc**, a small calculator app. The value of this repo is not the
-calculator itself; it is the end-to-end product-engineering loop:
+当前重点不是提前交付 SmallCalc 计算器程序，而是验证：
 
-1. XiaoWu writes a PRD.
-2. XiaoWu creates a GitHub Issue with a structured task spec.
-3. CC reads the Issue and implements the product through a branch and PR.
-4. CC submits an implementation report in the PR body.
-5. XiaoWu reviews the PR against the acceptance criteria.
-6. XiaoWu requests changes on the first pass.
-7. CC fixes the failed criteria.
-8. XiaoWu approves the PR.
+1. 小五先创建 PRD。
+2. 小五再向 CC 发出 TaskSpec。
+3. CC 只有收到小五指令后，才开始实现。
+4. 小五根据报告进行验收。
+5. 小五可以判定不通过并列出不合格项。
+6. CC 根据验收结果修复。
+7. 小五最终验收通过。
 
-## Main Commands
+## 当前状态
+
+- SmallCalc 程序实现不应提前存在。
+- 页面打开后处于 `0 / 7` 的等待状态。
+- 点击“小五发出指令”后，UI 才开始模拟流程推进。
+- 当前 UI 是可重放 demo，不会直接触发真实 GitHub PR 或真实 Codex/Qoder 执行。
+
+## 本地运行
 
 ```bash
-npm run xiaowu:issue
-npm run cc:first
-npm run xiaowu:review
-npm run cc:fix
-npm run xiaowu:approve
+npm install
+npm run dev
 ```
 
-The scripts use real local tools:
+打开：
 
-- `gh` for GitHub Issue, PR, and review operations
-- `codex exec` for CC
-- `.agentbus` for local audit logs
+```text
+http://127.0.0.1:5173/
+```
 
-## Demo Product
+## 验证
 
-SmallCalc uses:
+```bash
+npm test
+npm run lint
+npm run build
+npm run test:e2e
+```
 
-- Vite
-- React
-- TypeScript
-- Vitest
-- Testing Library
-- Playwright
-- GitHub Actions
+## 后续真实接入
 
-See [docs/smallcalc-prd.md](docs/smallcalc-prd.md) for XiaoWu's PRD.
+后续如果要接入真实 GitHub 和真实 Coding Agent，必须把“小五发出 TaskSpec”作为 CC 启动的前置门禁。CC 不应在小五发令前创建实现分支、提交 PR 或生成 SmallCalc 程序代码。

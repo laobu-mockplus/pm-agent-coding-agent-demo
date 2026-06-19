@@ -4,20 +4,32 @@ import { describe, expect, it } from "vitest";
 import App from "./App";
 
 describe("小五工作台", () => {
-  it("默认展示小五创建 PRD 的第一步", () => {
+  it("默认等待小五发令，不展示已开始实现的状态", () => {
     render(<App />);
 
     expect(
       screen.getByRole("heading", { name: "小五工作台：SmallCalc MVP 验收演示" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "等待小五发出第一条指令" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("SmallCalc 尚未开始实现。");
+    expect(screen.getByText("0%")).toBeInTheDocument();
+  });
+
+  it("小五发出指令后展示创建 PRD 的第一步", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "小五发出指令" }));
+
     expect(screen.getByRole("heading", { name: "小五创建 SmallCalc PRD" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("PRD 已生成，进入任务分配。");
+    expect(screen.getByRole("status")).toHaveTextContent("小五已生成 PRD，尚未产生 SmallCalc 程序代码。");
   });
 
   it("可以按 7 个步骤逐步推进到最终通过", async () => {
     const user = userEvent.setup();
     render(<App />);
 
+    await user.click(screen.getByRole("button", { name: "小五发出指令" }));
     for (let index = 0; index < 6; index += 1) {
       await user.click(screen.getByRole("button", { name: "执行下一步" }));
     }
@@ -31,6 +43,7 @@ describe("小五工作台", () => {
     const user = userEvent.setup();
     render(<App />);
 
+    await user.click(screen.getByRole("button", { name: "小五发出指令" }));
     for (let index = 0; index < 4; index += 1) {
       await user.click(screen.getByRole("button", { name: "执行下一步" }));
     }
@@ -44,17 +57,17 @@ describe("小五工作台", () => {
 
     const statusStrip = screen.getByLabelText("当前流程状态");
     expect(within(statusStrip).getByText("100%")).toBeInTheDocument();
-    expect(screen.getByText("SmallCalc MVP is approved。PR 只保留 xiaowu:approved 标签。")).toBeInTheDocument();
+    expect(screen.getByText("SmallCalc MVP is approved。模拟 PR 进入 xiaowu:approved 状态。")).toBeInTheDocument();
   });
 
   it("可以从任意步骤重置回第一步", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "执行下一步" }));
+    await user.click(screen.getByRole("button", { name: "小五发出指令" }));
     await user.click(screen.getByRole("button", { name: "重置" }));
 
-    expect(screen.getByRole("heading", { name: "小五创建 SmallCalc PRD" })).toBeInTheDocument();
-    expect(screen.getByText("14%")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "等待小五发出第一条指令" })).toBeInTheDocument();
+    expect(screen.getByText("0%")).toBeInTheDocument();
   });
 });

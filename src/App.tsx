@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
-// 小五工作台的单页演示入口：当前阶段使用固定流程数据，验证 PM Agent 与 Coding Agent
-// 的可视化协作表达；后续接入真实编排时，应把 workflowSteps 替换为运行记录数据源。
+// 小五工作台的单页演示入口：当前阶段只模拟流程状态，不提前生成 SmallCalc 程序。
+// 后续接入真实编排时，应由小五发出 TaskSpec 后再触发 CC 运行并写回真实记录。
 type WorkflowStatus = "waiting" | "active" | "done" | "failed" | "approved";
 
 type WorkflowStep = {
@@ -26,7 +26,7 @@ const workflowSteps: WorkflowStep[] = [
     artifactTitle: "PRD v0.1",
     artifactBody: "SmallCalc 是一个基础计算器 MVP，需要支持四则运算、小数、清空、退格、历史记录和键盘输入。",
     evidence: ["docs/smallcalc-prd.md", "验收标准 AC-1 到 AC-8 已定义", "目标应用：SmallCalc"],
-    result: "PRD 已生成，进入任务分配。",
+    result: "小五已生成 PRD，尚未产生 SmallCalc 程序代码。",
   },
   {
     id: 2,
@@ -36,19 +36,19 @@ const workflowSteps: WorkflowStep[] = [
     summary: "小五把 PRD 转成 TaskSpec，要求 CC 在 GitHub PR 中提交实现报告。",
     artifactTitle: "TaskSpec",
     artifactBody: "实现 SmallCalc MVP，并在 PR body 中提交 CC Implementation Report，逐条说明 AC 状态。",
-    evidence: ["GitHub Issue #1", "任务类型：MVP implementation", "指定 Coding Agent：Codex"],
-    result: "任务已分配给 CC。",
+    evidence: ["模拟 GitHub Issue", "任务类型：MVP implementation", "指定 Coding Agent：Codex"],
+    result: "小五已发出任务指令，CC 此时才允许开始。",
   },
   {
     id: 3,
     title: "CC 完成第一次实现并提交报告",
     actor: "CC",
     statusAfterRun: "done",
-    summary: "CC 创建 PR，实现按钮式计算器，并提交第一次实现报告。",
+    summary: "CC 收到小五指令后才创建实现分支，模拟完成第一次实现报告。",
     artifactTitle: "第一次 CC Implementation Report",
     artifactBody: "基础计算器行为已完成，但键盘输入 AC-6 暂未完成，报告中保留 known gap。",
-    evidence: ["GitHub PR #2", "npm test 通过", "npm run build 通过", "AC-6 标记为未完成"],
-    result: "第一次实现已提交，等待小五验收。",
+    evidence: ["模拟 PR", "模拟 npm test 通过", "模拟 npm run build 通过", "AC-6 标记为未完成"],
+    result: "CC 第一次报告已提交，等待小五验收。",
   },
   {
     id: 4,
@@ -80,8 +80,8 @@ const workflowSteps: WorkflowStep[] = [
     summary: "CC 补齐键盘输入，并把键盘操作复用到同一套计算器逻辑。",
     artifactTitle: "第二次 CC Implementation Report",
     artifactBody: "新增 KeyboardEvent.key 到 CalculatorButton 的映射，补充 AC-6 测试，PR body 更新为全 AC 通过。",
-    evidence: ["commit 47c4425", "npm test：17 tests passed", "npm run build：passed", "AC-6 测试已覆盖"],
-    result: "修复完成，等待小五最终验收。",
+    evidence: ["模拟修复提交", "模拟 npm test：passed", "模拟 npm run build：passed", "AC-6 测试已覆盖"],
+    result: "CC 修复报告已提交，等待小五最终验收。",
   },
   {
     id: 7,
@@ -90,8 +90,8 @@ const workflowSteps: WorkflowStep[] = [
     statusAfterRun: "approved",
     summary: "小五重新运行测试和构建，确认 8 条 AC 全部通过。",
     artifactTitle: "XiaoWu PM Review: Approved",
-    artifactBody: "SmallCalc MVP is approved。PR 只保留 xiaowu:approved 标签。",
-    evidence: ["npm test：17 passed", "npm run build：passed", "PR comment: Approved", "label: xiaowu:approved"],
+    artifactBody: "SmallCalc MVP is approved。模拟 PR 进入 xiaowu:approved 状态。",
+    evidence: ["模拟 npm test：passed", "模拟 npm run build：passed", "模拟 PR comment: Approved", "label: xiaowu:approved"],
     result: "流程完成，小五 PM Agent demo 通过。",
   },
 ];
@@ -117,13 +117,14 @@ function statusLabel(status: WorkflowStatus) {
 }
 
 export default function App() {
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const currentStep = workflowSteps[currentStepIndex];
-  const completedCount = currentStepIndex + 1;
+  const [currentStepIndex, setCurrentStepIndex] = useState(-1);
+  const currentStep = currentStepIndex >= 0 ? workflowSteps[currentStepIndex] : null;
+  const completedCount = Math.max(currentStepIndex + 1, 0);
   const progress = Math.round((completedCount / workflowSteps.length) * 100);
 
   const eventLog = useMemo(() => [...workflowSteps.slice(0, completedCount)].reverse(), [completedCount]);
   const canGoNext = currentStepIndex < workflowSteps.length - 1;
+  const visibleStatus = currentStep ? statusLabel(currentStep.statusAfterRun) : "待小五发令";
 
   return (
     <main className="app-shell" aria-labelledby="app-title">
@@ -141,7 +142,7 @@ export default function App() {
         <div className="run-controls" aria-label="流程控制">
           <button
             className="secondary"
-            onClick={() => setCurrentStepIndex(0)}
+            onClick={() => setCurrentStepIndex(-1)}
             type="button"
           >
             重置
@@ -152,7 +153,7 @@ export default function App() {
             onClick={() => setCurrentStepIndex((step) => Math.min(step + 1, workflowSteps.length - 1))}
             type="button"
           >
-            {canGoNext ? "执行下一步" : "流程已完成"}
+            {currentStepIndex < 0 ? "小五发出指令" : canGoNext ? "执行下一步" : "流程已完成"}
           </button>
         </div>
       </header>
@@ -160,11 +161,11 @@ export default function App() {
       <section className="status-strip" aria-label="当前流程状态">
         <div>
           <span>当前步骤</span>
-          <strong>{`${currentStep.id} / ${workflowSteps.length}`}</strong>
+          <strong>{`${completedCount} / ${workflowSteps.length}`}</strong>
         </div>
         <div>
           <span>当前角色</span>
-          <strong>{currentStep.actor}</strong>
+          <strong>{currentStep?.actor ?? "小五"}</strong>
         </div>
         <div>
           <span>流程进度</span>
@@ -172,7 +173,7 @@ export default function App() {
         </div>
         <div>
           <span>验收状态</span>
-          <strong>{statusLabel(currentStep.statusAfterRun)}</strong>
+          <strong>{visibleStatus}</strong>
         </div>
       </section>
 
@@ -210,33 +211,35 @@ export default function App() {
         <section className="detail-panel" aria-labelledby="detail-title">
           <div className="detail-header">
             <div>
-              <p className="eyebrow">{`Step ${currentStep.id}`}</p>
-              <h2 id="detail-title">{currentStep.title}</h2>
+              <p className="eyebrow">{currentStep ? `Step ${currentStep.id}` : "Ready"}</p>
+              <h2 id="detail-title">{currentStep?.title ?? "等待小五发出第一条指令"}</h2>
             </div>
-            <span className={`state-pill ${currentStep.statusAfterRun}`}>
-              {statusLabel(currentStep.statusAfterRun)}
+            <span className={`state-pill ${currentStep?.statusAfterRun ?? "waiting"}`}>
+              {visibleStatus}
             </span>
           </div>
 
-          <p className="summary">{currentStep.summary}</p>
+          <p className="summary">
+            {currentStep?.summary ?? "当前没有 SmallCalc 程序实现，也没有 CC 执行分支。点击“小五发出指令”后，才开始模拟 PRD、TaskSpec、CC 实现和小五验收流程。"}
+          </p>
 
           <div className="artifact-block">
             <div>
               <p className="eyebrow">Artifact</p>
-              <h3>{currentStep.artifactTitle}</h3>
+              <h3>{currentStep?.artifactTitle ?? "未生成"}</h3>
             </div>
-            <p>{currentStep.artifactBody}</p>
+            <p>{currentStep?.artifactBody ?? "SmallCalc 处于未启动状态；小五尚未向 CC 下发实现任务。"}</p>
           </div>
 
           <div className="evidence-grid">
-            {currentStep.evidence.map((item) => (
+            {(currentStep?.evidence ?? ["无实现分支", "无打开的 SmallCalc PR", "等待小五发令"]).map((item) => (
               <span key={item}>{item}</span>
             ))}
           </div>
 
           <div className="result-block" role="status" aria-live="polite">
             <span>结果</span>
-            <strong>{currentStep.result}</strong>
+            <strong>{currentStep?.result ?? "SmallCalc 尚未开始实现。"}</strong>
           </div>
         </section>
 
@@ -247,15 +250,25 @@ export default function App() {
           </div>
 
           <div className="log-list">
-            {eventLog.map((step) => (
-              <article className="log-row" key={step.id}>
-                <span>{`#${step.id}`}</span>
+            {eventLog.length > 0 ? (
+              eventLog.map((step) => (
+                <article className="log-row" key={step.id}>
+                  <span>{`#${step.id}`}</span>
+                  <div>
+                    <strong>{step.title}</strong>
+                    <p>{step.result}</p>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <article className="log-row">
+                <span>#0</span>
                 <div>
-                  <strong>{step.title}</strong>
-                  <p>{step.result}</p>
+                  <strong>等待小五指令</strong>
+                  <p>当前没有 SmallCalc 实现任务。</p>
                 </div>
               </article>
-            ))}
+            )}
           </div>
         </aside>
       </section>

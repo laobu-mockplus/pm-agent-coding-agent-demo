@@ -4,6 +4,10 @@ test("小五工作台可以逐步演示不通过到通过", async ({ page }) => 
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "小五工作台：SmallCalc MVP 验收演示" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "等待小五发出第一条指令" })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("SmallCalc 尚未开始实现。");
+
+  await page.getByRole("button", { name: "小五发出指令" }).click();
   await expect(page.getByRole("heading", { name: "小五创建 SmallCalc PRD" })).toBeVisible();
 
   for (let index = 0; index < 4; index += 1) {
