@@ -1,9 +1,63 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
+function createAgentBusState(hasTask = false) {
+  return {
+    messages: hasTask
+      ? [
+          {
+            id: "MSG-001",
+            from: "小五",
+            to: "CC",
+            type: "TaskSpec",
+            channel: ".agentbus/cc-inbox",
+            status: "queued",
+            payload: ["目标：SmallCalc", "目标仓库：/tmp/smallcalc-app"],
+          },
+        ]
+      : [],
+    run: hasTask
+      ? {
+          id: "run-test",
+          status: "running",
+          targetRepo: "/tmp/smallcalc-app",
+          events: [{ at: "2026-06-19T00:00:00.000Z", type: "stdout", text: "CC received TaskSpec." }],
+        }
+      : null,
+  };
+}
+
 describe("小五工作台", () => {
+  let hasTask = false;
+
+  beforeEach(() => {
+    hasTask = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL, init?: { method?: string }) => {
+        const url = String(input);
+
+        if (url === "/api/agentbus/tasks/smallcalc" && init?.method === "POST") {
+          hasTask = true;
+          return Response.json({ ok: true });
+        }
+
+        if (url === "/api/agentbus/reset" && init?.method === "POST") {
+          hasTask = false;
+          return Response.json({ ok: true });
+        }
+
+        if (url === "/api/agentbus/state") {
+          return Response.json(createAgentBusState(hasTask));
+        }
+
+        return Response.json({ error: "not found" }, { status: 404 });
+      }),
+    );
+  });
+
   it("默认等待小五发令，不展示已开始实现的状态", () => {
     render(<App />);
 
@@ -39,7 +93,9 @@ describe("小五工作台", () => {
     expect(within(communication).getByText("TaskSpec")).toBeInTheDocument();
     expect(within(communication).getByText("小五")).toBeInTheDocument();
     expect(within(communication).getByText("CC")).toBeInTheDocument();
-    expect(within(communication).getByText("目标：实现 SmallCalc MVP")).toBeInTheDocument();
+    expect(within(communication).getByText("目标：SmallCalc")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "CC 执行台" })).toBeInTheDocument();
+    expect(screen.getByText("CC received TaskSpec.")).toBeInTheDocument();
   });
 
   it("可以按 7 个步骤逐步推进到最终通过", async () => {

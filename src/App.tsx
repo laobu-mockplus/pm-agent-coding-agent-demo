@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 // 小五工作台的单页演示入口：当前阶段只模拟流程状态，不提前生成 SmallCalc 程序。
 // 后续接入真实编排时，应由小五发出 TaskSpec 后再触发 CC 运行并写回真实记录。
@@ -27,6 +27,24 @@ type CommunicationMessage = {
   payload: string[];
 };
 
+type RunEvent = {
+  at: string;
+  type: string;
+  text?: string;
+  status?: string;
+  code?: number | null;
+};
+
+type AgentBusState = {
+  messages: CommunicationMessage[];
+  run: {
+    id: string;
+    status: string;
+    targetRepo: string;
+    events: RunEvent[];
+  } | null;
+};
+
 const workflowSteps: WorkflowStep[] = [
   {
     id: 1,
@@ -44,32 +62,32 @@ const workflowSteps: WorkflowStep[] = [
     title: "小五给 CC 安排 MVP 任务",
     actor: "小五",
     statusAfterRun: "done",
-    summary: "小五把 PRD 转成 TaskSpec，要求 CC 在 GitHub PR 中提交实现报告。",
+    summary: "小五把 PRD 转成 TaskSpec，并通过真实 .agentbus inbox 发送给 CC。",
     artifactTitle: "TaskSpec",
-    artifactBody: "实现 SmallCalc MVP，并在 PR body 中提交 CC Implementation Report，逐条说明 AC 状态。",
-    evidence: ["模拟 GitHub Issue", "任务类型：MVP implementation", "指定 Coding Agent：Codex"],
-    result: "小五已发出任务指令，CC 此时才允许开始。",
+    artifactBody: "本轮先验证通信链路：CC 必须读取 TaskSpec，输出执行过程，并写回 ImplementationReport。",
+    evidence: [".agentbus/cc-inbox", "任务类型：communication probe", "指定 Coding Agent：Codex"],
+    result: "小五已写入真实 TaskSpec，orchestrator 开始拉起 CC。",
   },
   {
     id: 3,
-    title: "CC 完成第一次实现并提交报告",
+    title: "CC 执行任务并提交报告",
     actor: "CC",
     statusAfterRun: "done",
-    summary: "CC 收到小五指令后才创建实现分支，模拟完成第一次实现报告。",
-    artifactTitle: "第一次 CC Implementation Report",
-    artifactBody: "基础计算器行为已完成，但键盘输入 AC-6 暂未完成，报告中保留 known gap。",
-    evidence: ["模拟 PR", "模拟 npm test 通过", "模拟 npm run build 通过", "AC-6 标记为未完成"],
-    result: "CC 第一次报告已提交，等待小五验收。",
+    summary: "CC 由 orchestrator 拉起，读取 TaskSpec，并把真实报告写回小五 inbox。",
+    artifactTitle: "ImplementationReport",
+    artifactBody: "本轮报告只证明通信和执行链路：CC 已读到任务，未实现 SmallCalc，等待小五验收链路。",
+    evidence: [".agentbus/xiaowu-inbox", "CC stdout/stderr 已捕获", "run events 已写入"],
+    result: "CC 报告已提交，等待小五验收通信链路。",
   },
   {
     id: 4,
     title: "小五第一次验收",
     actor: "小五",
     statusAfterRun: "active",
-    summary: "小五按 PRD 中的 AC-1 到 AC-8 检查报告和实现结果。",
+    summary: "小五先验收通信链路是否成立，再决定是否进入真实 SmallCalc 实现。",
     artifactTitle: "验收检查表",
-    artifactBody: "AC-1 到 AC-5、AC-7、AC-8 通过；AC-6 键盘输入没有实现。",
-    evidence: ["检查 PR body", "检查测试结果", "对照 PRD 验收标准"],
+    artifactBody: "通信链路要求：TaskSpec 真实落盘、CC 真实执行、过程日志可见、ImplementationReport 真实写回。",
+    evidence: ["检查 cc-inbox", "检查 run events", "检查 xiaowu-inbox"],
     result: "发现不合格项，准备给出不通过判定。",
   },
   {
@@ -107,63 +125,6 @@ const workflowSteps: WorkflowStep[] = [
   },
 ];
 
-const communicationMessages: CommunicationMessage[] = [
-  {
-    id: "MSG-001",
-    stepId: 2,
-    from: "小五",
-    to: "CC",
-    type: "TaskSpec",
-    channel: "GitHub Issue + .agentbus",
-    status: "已发送",
-    payload: [
-      "目标：实现 SmallCalc MVP",
-      "验收：AC-1 到 AC-8",
-      "报告：PR body 必须包含 CC ImplementationReport",
-    ],
-  },
-  {
-    id: "MSG-002",
-    stepId: 3,
-    from: "CC",
-    to: "小五",
-    type: "ImplementationReport",
-    channel: "Pull Request body",
-    status: "已回传",
-    payload: ["实现：基础计算器", "验证：测试和构建通过", "缺口：AC-6 键盘输入未完成"],
-  },
-  {
-    id: "MSG-003",
-    stepId: 5,
-    from: "小五",
-    to: "CC",
-    type: "ReviewRequest",
-    channel: "PR review comment",
-    status: "已驳回",
-    payload: ["判定：不通过", "失败项：AC-6 Keyboard input", "要求：补测试并复用同一套计算器逻辑"],
-  },
-  {
-    id: "MSG-004",
-    stepId: 6,
-    from: "CC",
-    to: "小五",
-    type: "FixReport",
-    channel: "Pull Request update",
-    status: "已回传",
-    payload: ["修复：键盘输入", "验证：AC-6 已覆盖", "报告：全部 AC 标记为通过"],
-  },
-  {
-    id: "MSG-005",
-    stepId: 7,
-    from: "小五",
-    to: "CC",
-    type: "Approval",
-    channel: "PR approval comment",
-    status: "已通过",
-    payload: ["判定：通过", "结果：SmallCalc MVP approved", "标签：xiaowu:approved"],
-  },
-];
-
 function getStepStatus(stepIndex: number, currentStepIndex: number): WorkflowStatus {
   if (stepIndex > currentStepIndex) {
     return "waiting";
@@ -186,14 +147,13 @@ function statusLabel(status: WorkflowStatus) {
 
 export default function App() {
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
+  const [agentBus, setAgentBus] = useState<AgentBusState | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
   const currentStep = currentStepIndex >= 0 ? workflowSteps[currentStepIndex] : null;
   const completedCount = Math.max(currentStepIndex + 1, 0);
   const progress = Math.round((completedCount / workflowSteps.length) * 100);
 
-  const visibleMessages = useMemo(
-    () => communicationMessages.filter((message) => message.stepId <= completedCount).reverse(),
-    [completedCount],
-  );
+  const visibleMessages = useMemo(() => [...(agentBus?.messages ?? [])].reverse(), [agentBus?.messages]);
   const canGoNext = currentStepIndex < workflowSteps.length - 1;
   const visibleStatus = currentStep ? statusLabel(currentStep.statusAfterRun) : "待小五发令";
   const nextActionLabel =
@@ -204,6 +164,77 @@ export default function App() {
         : canGoNext
           ? "执行下一步"
           : "流程已完成";
+
+  async function refreshAgentBus() {
+    try {
+      const response = await fetch("/api/agentbus/state");
+
+      if (!response.ok) {
+        throw new Error(`agentbus state failed: ${response.status}`);
+      }
+
+      setAgentBus(await response.json());
+      setApiError(null);
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "无法读取 agentbus");
+    }
+  }
+
+  async function resetWorkflow() {
+    setCurrentStepIndex(-1);
+
+    try {
+      await fetch("/api/agentbus/reset", { method: "POST" });
+      await refreshAgentBus();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "无法重置 agentbus");
+    }
+  }
+
+  async function advanceWorkflow() {
+    if (currentStepIndex === 0) {
+      setCurrentStepIndex(1);
+
+      try {
+        const response = await fetch("/api/agentbus/tasks/smallcalc", { method: "POST" });
+
+        if (!response.ok) {
+          throw new Error(`send task failed: ${response.status}`);
+        }
+
+        await refreshAgentBus();
+      } catch (error) {
+        setApiError(error instanceof Error ? error.message : "无法发送 TaskSpec");
+      }
+      return;
+    }
+
+    setCurrentStepIndex((step) => Math.min(step + 1, workflowSteps.length - 1));
+  }
+
+  useEffect(() => {
+    void refreshAgentBus();
+    const timer = window.setInterval(() => {
+      void refreshAgentBus();
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (currentStepIndex !== -1 || !agentBus) {
+      return;
+    }
+
+    if (agentBus.messages.some((message) => message.type === "ImplementationReport")) {
+      setCurrentStepIndex(2);
+      return;
+    }
+
+    if (agentBus.messages.some((message) => message.type === "TaskSpec")) {
+      setCurrentStepIndex(1);
+    }
+  }, [agentBus, currentStepIndex]);
 
   return (
     <main className="app-shell" aria-labelledby="app-title">
@@ -221,7 +252,7 @@ export default function App() {
         <div className="run-controls" aria-label="流程控制">
           <button
             className="secondary"
-            onClick={() => setCurrentStepIndex(-1)}
+            onClick={() => void resetWorkflow()}
             type="button"
           >
             重置
@@ -229,7 +260,7 @@ export default function App() {
           <button
             className="primary"
             disabled={!canGoNext}
-            onClick={() => setCurrentStepIndex((step) => Math.min(step + 1, workflowSteps.length - 1))}
+            onClick={() => void advanceWorkflow()}
             type="button"
           >
             {nextActionLabel}
@@ -329,6 +360,13 @@ export default function App() {
           </div>
 
           <div className="comm-list" aria-label="小五和 CC 通信消息">
+            {apiError ? (
+              <article className="comm-empty warning">
+                <strong>agentbus 暂不可读</strong>
+                <p>{apiError}</p>
+              </article>
+            ) : null}
+
             {visibleMessages.length > 0 ? (
               visibleMessages.map((message) => (
                 <article className="comm-row" key={message.id}>
@@ -356,6 +394,35 @@ export default function App() {
                 <p>当前没有 TaskSpec 发给 CC；SmallCalc 不会提前开始实现。</p>
               </article>
             )}
+
+            {agentBus?.run ? (
+              <section className="cc-run-panel" aria-labelledby="cc-run-title">
+                <div className="run-header">
+                  <div>
+                    <p className="eyebrow">CC Execution</p>
+                    <h3 id="cc-run-title">CC 执行台</h3>
+                  </div>
+                  <span>{agentBus.run.status}</span>
+                </div>
+                <p className="channel">{agentBus.run.id}</p>
+                <p className="channel">{agentBus.run.targetRepo}</p>
+                <div className="run-events" aria-label="CC 执行过程消息">
+                  {agentBus.run.events.length > 0 ? (
+                    agentBus.run.events.map((event, index) => (
+                      <article className={`run-event ${event.type}`} key={`${event.at}-${index}`}>
+                        <span>{event.type}</span>
+                        <p>{event.text ?? event.status ?? `exit code ${event.code}`}</p>
+                      </article>
+                    ))
+                  ) : (
+                    <article className="run-event">
+                      <span>queued</span>
+                      <p>等待 CC 输出。</p>
+                    </article>
+                  )}
+                </div>
+              </section>
+            ) : null}
           </div>
         </aside>
       </section>

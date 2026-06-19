@@ -17,8 +17,19 @@
 - SmallCalc 程序实现不应提前存在。
 - 页面打开后处于 `0 / 7` 的等待状态。
 - 点击“开始：小五创建 PRD”后，UI 才开始模拟流程推进。
-- 第二步会在“通信通道”里显示 `小五 -> CC` 的 `TaskSpec` 消息包。
-- 当前 UI 是可重放 demo，不会直接触发真实 GitHub PR 或真实 Codex/Qoder 执行。
+- 第二步会把真实 `TaskSpec` 写入 `.agentbus/cc-inbox/`。
+- 本地 orchestrator 会拉起真实 `codex exec`，并把 stdout/stderr 写入 `.agentbus/runs/<runId>/events.jsonl`。
+- CC 完成后会把真实 `ImplementationReport` 写回 `.agentbus/xiaowu-inbox/`。
+- 当前只验证通信和执行链路，不会让 CC 提前实现 SmallCalc。
+
+## 通信目录
+
+```text
+.agentbus/
+  cc-inbox/                 # 小五发给 CC 的 TaskSpec
+  xiaowu-inbox/             # CC 写回给小五的 ImplementationReport
+  runs/<runId>/events.jsonl # CC 执行过程 stdout/stderr/exit
+```
 
 ## 本地运行
 

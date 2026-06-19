@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("小五工作台可以逐步演示不通过到通过", async ({ page }) => {
+  await page.request.post("/api/agentbus/reset");
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "小五工作台：SmallCalc MVP 验收演示" })).toBeVisible();
@@ -14,8 +15,10 @@ test("小五工作台可以逐步演示不通过到通过", async ({ page }) => 
   await page.getByRole("button", { name: "发送 TaskSpec 给 CC" }).click();
   const communication = page.getByLabel("小五和 CC 通信消息");
   await expect(communication.getByText("MSG-001")).toBeVisible();
-  await expect(communication.getByText("TaskSpec")).toBeVisible();
-  await expect(communication.getByText("目标：实现 SmallCalc MVP")).toBeVisible();
+  await expect(communication.getByText("TaskSpec", { exact: true })).toBeVisible();
+  await expect(communication.getByText("目标：SmallCalc")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "CC 执行台" })).toBeVisible();
+  await expect(page.getByLabel("CC 执行过程消息").getByText("CC test worker received TaskSpec.")).toBeVisible();
 
   for (let index = 0; index < 3; index += 1) {
     await page.getByRole("button", { name: "执行下一步" }).click();
@@ -32,6 +35,7 @@ test("小五工作台可以逐步演示不通过到通过", async ({ page }) => 
 });
 
 test("小五工作台使用固定窗口和内部滚动", async ({ page }) => {
+  await page.request.post("/api/agentbus/reset");
   await page.setViewportSize({ width: 1280, height: 820 });
   await page.goto("/");
 

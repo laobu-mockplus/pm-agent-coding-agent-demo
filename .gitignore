@@ -4,6 +4,8 @@ playwright-report
 test-results
 .agentbus/runs/*
 !.agentbus/runs/.gitkeep
+.agentbus/cc-inbox/*
+.agentbus/xiaowu-inbox/*
 .agentbus/*.json
 .agentbus/*.md
 *.tsbuildinfo
