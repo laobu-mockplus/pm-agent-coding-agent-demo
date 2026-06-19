@@ -137,6 +137,24 @@ function statusLabel(status: WorkflowStatus) {
   return labels[status];
 }
 
+function shouldShowCodexEvent(event: RunEvent) {
+  const method = event.method ?? "";
+
+  if (method === "item/agentMessage/delta" || method === "item/reasoning/delta") {
+    return false;
+  }
+
+  if (method.endsWith("/delta") && event.itemType !== "commandExecution") {
+    return false;
+  }
+
+  if (method === "thread/tokenUsage/updated") {
+    return false;
+  }
+
+  return true;
+}
+
 export default function App() {
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
   const [agentBus, setAgentBus] = useState<AgentBusState | null>(null);
@@ -153,7 +171,10 @@ export default function App() {
   const hasReview = artifacts.some((artifact) => artifact.type === "ReviewResult");
 
   const codexEvents = useMemo(
-    () => (agentBus?.run?.events ?? []).filter((event) => event.type === "codex-event" || event.type === "codex-request"),
+    () =>
+      (agentBus?.run?.events ?? []).filter(
+        (event) => (event.type === "codex-event" || event.type === "codex-request") && shouldShowCodexEvent(event),
+      ),
     [agentBus?.run?.events],
   );
   const chatItems = useMemo<ChatItem[]>(() => {
